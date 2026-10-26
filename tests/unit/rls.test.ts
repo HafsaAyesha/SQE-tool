@@ -1,91 +1,83 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
-const db = new PGlite();
-const alice = '11111111-1111-4111-8111-111111111111';
-const bob = '22222222-2222-4222-8222-222222222222';
-const project = '33333333-3333-4333-8333-333333333333';
-const source = '44444444-4444-4444-8444-444444444444';
-async function asUser(id: string) {
-  await db.exec('reset role');
-  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [id]);
-  await db.exec('set role authenticated');
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { randomBytes, randomUUID } from 'node:crypto';
+
+// No mocks: assertions use the public anon key and independent signed-in clients.
+// The service-role key is restricted to creating and deleting this run's test users.
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const required = process.env.COSTLENS_REQUIRE_LIVE_RLS === '1';
+const configured = Boolean(url && anonKey && serviceKey);
+const options = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
+const createdUsers: string[] = [];
+let admin: SupabaseClient;
+let clientA: SupabaseClient;
+let clientB: SupabaseClient;
+let projectId: string;
+let ownerId: string;
+function checkError(operation: string, error: { code?: string; status?: number } | null) {
+  if (error) throw new Error(`${operation} failed (${error.code ?? error.status ?? 'unknown'}). Check Supabase access, keys, and migration state.`);
 }
-beforeAll(async () => {
-  await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
-    create schema auth; create table auth.users (id uuid primary key);
-    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-    grant usage on schema auth to authenticated, anon;
-    insert into auth.users values ('${alice}'), ('${bob}');`);
-  await db.exec(readFileSync('supabase/migrations/0001_init.sql', 'utf8'));
-}, 30000);
-afterAll(async () => { await db.close(); });
-describe.sequential('migration and Postgres ownership policies', () => {
-  it('enables RLS on every table and gives ai_cache no policies', async () => {
-    const tables = await db.query<{relname: string; relrowsecurity: boolean}>("select relname, relrowsecurity from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'");
-    expect(tables.rows).toHaveLength(5);
-    expect(tables.rows.every(row => row.relrowsecurity)).toBe(true);
-    expect((await db.query("select * from pg_policies where tablename = 'ai_cache'")).rows).toHaveLength(0);
-  });
-  it('allows owners to insert, read and update their projects and children', async () => {
-    await asUser(alice);
-    await db.query('insert into projects(id, owner_id, name) values ($1,$2,$3)', [project, alice, 'CodeAudit']);
-    await db.query('insert into data_sources(id, project_id, type) values ($1,$2,$3)', [source, project, 'csv']);
-    await db.query('insert into cost_items(project_id, source_id, item, actual) values ($1,$2,$3,$4)', [project, source, 'Cloud', 12.5]);
-    await db.query('insert into mapping_templates(owner_id, source_type, name, mapping) values ($1,$2,$3,$4)', [alice, 'csv', 'Default', '{}']);
-    for (const table of ['projects', 'data_sources', 'cost_items', 'mapping_templates']) {
-      expect((await db.query(`select * from ${table}`)).rows).toHaveLength(1);
+
+describe.skipIf(!configured && !required).sequential('live Supabase RLS with two signed-in anon-key clients', () => {
+  beforeAll(async () => {
+    if (!url || !anonKey || !serviceKey) throw new Error('Live RLS requires NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY. Set them securely; never paste keys into chat.');
+    admin = createClient(url, serviceKey, options);
+    clientA = createClient(url, anonKey, options);
+    clientB = createClient(url, anonKey, options);
+    const run = randomUUID();
+    for (const [label, client] of [['a', clientA], ['b', clientB]] as const) {
+      const email = `costlens-rls-${run}-${label}@example.com`;
+      const password = randomBytes(32).toString('base64url');
+      const { data: created, error: createError } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+      checkError(`Create test user ${label.toUpperCase()}`, createError);
+      if (!created.user) throw new Error('Test user creation returned no user');
+      createdUsers.push(created.user.id);
+      if (label === 'a') ownerId = created.user.id;
+      const { data, error } = await client.auth.signInWithPassword({ email, password });
+      checkError(`Sign in test user ${label.toUpperCase()}`, error);
+      expect(data.user?.id).toBe(created.user.id);
     }
-    expect((await db.query("update projects set name = 'Updated' returning id")).rows).toHaveLength(1);
-    expect((await db.query("update data_sources set name = 'Costs' returning id")).rows).toHaveLength(1);
-    expect((await db.query("update cost_items set actual = 14 returning id")).rows).toHaveLength(1);
-    expect((await db.query("update mapping_templates set name = 'Updated' returning id")).rows).toHaveLength(1);
-  });
-  it('blocks another user from reading, updating, deleting or inserting into owned records', async () => {
-    await asUser(bob);
-    for (const table of ['projects', 'data_sources', 'cost_items', 'mapping_templates']) {
-      expect((await db.query(`select * from ${table}`)).rows).toHaveLength(0);
-      expect((await db.query(`delete from ${table} returning id`)).rows).toHaveLength(0);
+    const { data, error } = await clientA.from('projects').insert({ owner_id: ownerId, name: `RLS validation ${run}`, currency: 'USD' }).select('id').single();
+    checkError('Create A’s project through anon-key client', error);
+    expect(data?.id).toBeTruthy();
+    projectId = data!.id;
+  }, 60000);
+
+  afterAll(async () => {
+    if (!admin) return;
+    const errors: string[] = [];
+    // auth.users -> projects -> cost_items/data_sources cascades remove only our fixtures.
+    for (const id of createdUsers) {
+      const { error } = await admin.auth.admin.deleteUser(id);
+      if (error) errors.push(`Could not remove test user ${id} (${error.code ?? error.status})`);
     }
-    expect((await db.query("update projects set name = 'Stolen' returning id")).rows).toHaveLength(0);
-    expect((await db.query("update data_sources set name = 'Stolen' returning id")).rows).toHaveLength(0);
-    expect((await db.query("update cost_items set item = 'Stolen' returning id")).rows).toHaveLength(0);
-    expect((await db.query("update mapping_templates set name = 'Stolen' returning id")).rows).toHaveLength(0);
-    await expect(db.query("insert into projects(owner_id, name) values ($1,'Stolen')", [alice])).rejects.toThrow(/row-level security/);
-    await expect(db.query("insert into data_sources(project_id, type) values ($1,'csv')", [project])).rejects.toThrow(/row-level security/);
-    await expect(db.query("insert into cost_items(project_id, item) values ($1,'Stolen')", [project])).rejects.toThrow(/row-level security/);
-    await expect(db.query("insert into mapping_templates(owner_id, source_type, name, mapping) values ($1,'csv','Stolen','{}')", [alice])).rejects.toThrow(/row-level security/);
+    if (errors.length) throw new Error(errors.join('; '));
+  }, 30000);
+
+  it('A can select their own project (positive access control)', async () => {
+    const { data, error } = await clientA.from('projects').select('id, owner_id').eq('id', projectId);
+    expect(error).toBeNull();
+    expect(data).toEqual([{ id: projectId, owner_id: ownerId }]);
   });
-  it('prevents changing ownership or moving children to someone else’s project', async () => {
-    await db.query("insert into projects(owner_id, name) values ($1,'Bob')", [bob]);
-    const bobProject = (await db.query<{id: string}>('select id from projects')).rows[0].id;
-    await asUser(alice);
-    await expect(db.query('update projects set owner_id = $1', [bob])).rejects.toThrow(/row-level security/);
-    await expect(db.query('update data_sources set project_id = $1', [bobProject])).rejects.toThrow(/row-level security/);
-    await expect(db.query('update cost_items set project_id = $1', [bobProject])).rejects.toThrow(/row-level security/);
-    await expect(db.query('update mapping_templates set owner_id = $1', [bob])).rejects.toThrow(/row-level security/);
+  it('B selecting A’s project returns zero rows without an error', async () => {
+    const { data, error } = await clientB.from('projects').select('id').eq('id', projectId);
+    expect(error).toBeNull();
+    expect(data).toEqual([]);
   });
-  it('blocks cross-project source references and invalid values', async () => {
-    const other = (await db.query<{id: string}>("insert into projects(owner_id, name) values ($1,'Other') returning id", [alice])).rows[0].id;
-    await expect(db.query("insert into cost_items(project_id, source_id, item) values ($1,$2,'Bad reference')", [other, source])).rejects.toThrow(/foreign key/);
-    await expect(db.query('insert into projects(owner_id, name) values ($1,$2)', [alice, 'x'.repeat(121)])).rejects.toThrow(/check constraint/);
-    await expect(db.query("insert into cost_items(project_id,item,confidence) values ($1,'Bad',1.1)", [project])).rejects.toThrow(/check constraint/);
+  it('A can insert a cost item into their own project', async () => {
+    const { data, error } = await clientA.from('cost_items').insert({ project_id: projectId, item: 'Owner control', actual: 12.5, currency: 'USD' }).select('id').single();
+    expect(error).toBeNull();
+    expect(data?.id).toBeTruthy();
   });
-  it('denies ai_cache access for authenticated and anonymous roles', async () => {
-    await expect(db.query('select * from ai_cache')).rejects.toThrow(/permission denied/);
-    await expect(db.query("insert into ai_cache values ('hash','summary','{}',now())")).rejects.toThrow(/permission denied/);
-    await db.exec('reset role; set role anon');
-    await expect(db.query('select * from ai_cache')).rejects.toThrow(/permission denied/);
-    // Supabase may grant anon table privileges by default; RLS must still return no rows.
-    await db.exec('reset role; grant select on projects, data_sources, cost_items, mapping_templates to anon; set role anon');
-    for (const table of ['projects', 'data_sources', 'cost_items', 'mapping_templates']) expect((await db.query(`select * from ${table}`)).rows).toHaveLength(0);
-  });
-  it('allows owner deletes, preserves costs on source deletion and cascades project deletion', async () => {
-    await asUser(alice);
-    await db.query('delete from data_sources where id = $1', [source]);
-    expect((await db.query<{source_id: string | null}>('select source_id from cost_items')).rows[0].source_id).toBeNull();
-    await db.query('delete from projects where id = $1', [project]);
-    expect((await db.query('select * from cost_items')).rows).toHaveLength(0);
-    expect((await db.query('delete from mapping_templates returning id')).rows).toHaveLength(1);
+  it('B inserting a cost item into A’s project is rejected by RLS', async () => {
+    const { data, error } = await clientB.from('cost_items').insert({ project_id: projectId, item: 'Unauthorized insertion', actual: 99, currency: 'USD' }).select('id');
+    expect(data).toBeNull();
+    expect(error?.code).toBe('42501');
+    expect(error?.message).toMatch(/row.level security/i);
+    const { data: existing, error: queryError } = await clientA.from('cost_items').select('id').eq('project_id', projectId).eq('item', 'Unauthorized insertion');
+    expect(queryError).toBeNull();
+    expect(existing).toEqual([]);
   });
 });

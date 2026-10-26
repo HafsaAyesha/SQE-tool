@@ -24,8 +24,34 @@ Every server handler receiving a project ID must first call `await requireProjec
 
 ## Validation and limits
 
-`npm run test` executes the real migration in PGlite (embedded Postgres) with minimal Supabase auth schema/roles and two users, testing RLS and constraints under a non-superuser role. It also tests auth validation, auth action outcomes, session cookie refresh, confirmation handling and `requireProject`. Provider calls in those unit tests are mocked.
+`tests/unit/migration.test.ts` executes the real migration in PGlite (embedded Postgres) with minimal Supabase auth schema/roles and two users, testing RLS and constraints under a non-superuser role. `tests/unit/rls.test.ts` uses real Supabase clients and never mocks the provider: a service-role client creates/deletes its generated test users, while both user clients sign in and make all assertions using the anon key. It includes positive owner controls and requires B’s denied insert to return SQLSTATE 42501. It also tests auth validation, auth action outcomes, session cookie refresh, confirmation handling and `requireProject`. Provider calls in those unit tests are mocked.
 
-`npm run test:e2e` runs against a production build, checking login/signup forms, invalid inputs, persistent themes, responsive layouts and signed-out route redirects. It never creates accounts or sends emails. It requires no Supabase connection. Screenshots are saved as `docs/screenshots/1.2-signup-*.png`. Historical Step 1.1 shell screenshots remain intact; anonymous access to that shell is intentionally no longer supported.
+`npm run test:e2e` runs against a production build, checking login/signup forms, invalid inputs, persistent themes, responsive layouts and signed-out route redirects. Its ordinary smoke checks need no Supabase connection. The opt-in local browser runner also creates, signs in, and removes generated test accounts; it sends no emails because local confirmation is disabled. Screenshots are saved as `docs/screenshots/1.2-signup-*.png`. Historical Step 1.1 shell screenshots remain intact; anonymous access to that shell is intentionally no longer supported.
 
 Live hosted signup/login/logout, email delivery, and deployment of the migration remain unverified until project configuration is supplied. Passing local tests does not establish hosted service readiness.
+
+
+## Reproduce the fresh local Supabase validation
+
+The pinned Supabase CLI and `supabase/config.toml` support a real local database/Auth/Data API stack. These commands target the local project only. A reset destroys **local test data**; never replace `--local` with `--linked` against an existing hosted project.
+
+```sh
+npm ci
+SUPABASE_HOME=/workspace/.supabase-cli SUPABASE_USE_SLIM_IMAGES=true npx supabase start --ignore-health-check -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+SUPABASE_HOME=/workspace/.supabase-cli SUPABASE_USE_SLIM_IMAGES=true npx supabase db reset --local --no-seed --yes
+npm run test:rls:local
+node scripts/test-local-rls.mjs --all
+node scripts/test-local-rls.mjs --browser
+```
+
+This managed environment requires the official slim images to fit its Docker storage. Their BusyBox wget health probe uses the container's proxy even for loopback and gets a 403. `--ignore-health-check` keeps that stack running; readiness was established separately through a direct container-loopback Auth health request, actual signed-in Data API requests, and real browser auth flows. It is not evidence of service readiness by itself. The direct local probe was:
+
+```sh
+docker exec supabase_auth_SQE-tool wget -Y off -qO- http://127.0.0.1:9999/health
+```
+
+The local runner captures CLI status privately and passes generated local keys directly to child processes. It writes no credential files and prints no keys. `--all` runs all unit/database tests against that local project. `--browser` builds with the local public config and runs all browser tests, including actual signup, email menu, logout, and login at both widths. Rebuild with hosted public variables before deploying; local build output must not be deployed as hosted configuration.
+
+For an already-migrated hosted test project, securely configure `NEXT_PUBLIC_SUPABASE_URL` (the origin, without `/rest/v1/`), `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`, then run `npm run test:rls`. This command fails rather than skips if configuration is missing. Plain `npm run test` skips the four live tests when no connection is configured and reports them separately. The admin key is used for fixture setup/cleanup only. All application RLS assertions use anon-key clients with independent user sessions. Never reuse the privileged keys posted in chat; rotate them in Supabase and enter replacements securely.
+
+Catalog queries are in `docs/rls-inspection.sql`. Actual fresh-local query output is saved in `docs/1.2-rls-query-results.txt`. This proves local migration and RLS readiness, not migration or authentication on the hosted project.

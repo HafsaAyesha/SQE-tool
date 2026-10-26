@@ -1,0 +1,21 @@
+ schemaname |     tablename     | rowsecurity 
+------------+-------------------+-------------
+ public     | ai_cache          | t
+ public     | cost_items        | t
+ public     | data_sources      | t
+ public     | mapping_templates | t
+ public     | projects          | t
+(5 rows)
+
+ schemaname |     tablename     |       policyname        |      roles      | cmd |                                            qual                                             |                                         with_check                                          
+------------+-------------------+-------------------------+-----------------+-----+---------------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------
+ public     | cost_items        | cost_items_owner        | {authenticated} | ALL | (EXISTS ( SELECT 1                                                                         +| (EXISTS ( SELECT 1                                                                         +
+            |                   |                         |                 |     |    FROM projects p                                                                         +|    FROM projects p                                                                         +
+            |                   |                         |                 |     |   WHERE ((p.id = cost_items.project_id) AND (p.owner_id = ( SELECT auth.uid() AS uid)))))   |   WHERE ((p.id = cost_items.project_id) AND (p.owner_id = ( SELECT auth.uid() AS uid)))))
+ public     | data_sources      | data_sources_owner      | {authenticated} | ALL | (EXISTS ( SELECT 1                                                                         +| (EXISTS ( SELECT 1                                                                         +
+            |                   |                         |                 |     |    FROM projects p                                                                         +|    FROM projects p                                                                         +
+            |                   |                         |                 |     |   WHERE ((p.id = data_sources.project_id) AND (p.owner_id = ( SELECT auth.uid() AS uid))))) |   WHERE ((p.id = data_sources.project_id) AND (p.owner_id = ( SELECT auth.uid() AS uid)))))
+ public     | mapping_templates | mapping_templates_owner | {authenticated} | ALL | (owner_id = ( SELECT auth.uid() AS uid))                                                    | (owner_id = ( SELECT auth.uid() AS uid))
+ public     | projects          | projects_owner          | {authenticated} | ALL | (owner_id = ( SELECT auth.uid() AS uid))                                                    | (owner_id = ( SELECT auth.uid() AS uid))
+(4 rows)
+

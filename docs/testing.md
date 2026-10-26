@@ -23,3 +23,14 @@ A browser rerun exposed stale dev output from a lingering development server sha
 New coverage lives in `tests/unit/auth.test.ts`, `authActions.test.ts`, `confirmation.test.ts`, `requireProject.test.ts`, `session.test.ts`, and `rls.test.ts`, plus the updated `tests/e2e/smoke.spec.ts`. Signup screenshots are in `docs/screenshots/1.2-signup-1440-dark.png` and `1.2-signup-390-dark.png`.
 
 Hosted migration execution, real signup/confirmation/login/logout and the authenticated user menu remain unverified because no Supabase URL or anon key is configured. See `docs/supabase.md` for the exact setup and verification steps. Step 1.2 is not yet ready for a hosted readiness claim.
+
+
+## Step 1.2 fresh Supabase acceptance validation
+
+A fresh real local Supabase project was started using official CLI slim images, then `supabase db reset --local --no-seed --yes` completed successfully and applied `0001_init.sql`. Actual `pg_tables`/`pg_policies` output is retained in `docs/1.2-rls-query-results.txt`: all five tables have rowsecurity=true; the four owner/child tables each have one authenticated ALL policy; ai_cache has no client policy.
+
+`node scripts/test-local-rls.mjs --all` executed `npm run test` with private local runtime bindings: 34 passed, zero skipped. This includes the four real anon-key signed-client RLS tests in `tests/unit/rls.test.ts`; PGlite-only checks moved to `tests/unit/migration.test.ts`. B reads zero rows from A's project and B's attempted cost insert fails with SQLSTATE 42501. A's positive-control reads/inserts succeed. All generated users and cascading project fixtures were removed; the final matching test-user count was zero.
+
+`node scripts/test-local-rls.mjs --browser` executed `npm run build` and `npm run test:e2e`: 6 passed, zero skipped. Alongside inline input errors and protected-route redirects, real signup/login/logout and the email menu were verified at desktop and mobile widths. `npm run lint`, `npm run typecheck`, and `git diff --check` also passed. No credential-shaped values were found by the repository scan. Only generated local test accounts were created; no hosted users or schemas were modified.
+
+The CLI's container-loopback health probe produced proxy 403s; a direct Auth health request and the functional API/browser suites established readiness independently. See `docs/supabase.md` for the diagnosed workaround and repeatable commands. The hosted URL/hostname and required variable names were saved as an environment draft; hosted credentials are still not injected into the running machine. Hosted migration, hosted auth, and email delivery remain unverified. Privileged credentials shared in chat must be rotated and configured securely before hosted validation.
