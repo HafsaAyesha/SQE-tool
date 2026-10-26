@@ -1,6 +1,6 @@
 # CostLens
 
-A source-agnostic cost analysis app. Step 1.1 provides the landing page, responsive workspace shell, theme system, UI components and shared helpers. Authentication and data integrations are placeholders for later steps.
+A source-agnostic cost analysis app. Step 1.1 provides the landing page, responsive workspace shell, theme system, UI components and shared helpers. Step 1.2 adds Supabase SSR authentication, protected workspace routes, an ownership schema and RLS. Hosted Supabase configuration is required to use authentication.
 
 Requires Node.js 22+ and npm. Uses Next.js 15, strict TypeScript, App Router, Tailwind 4 and shadcn/ui new-york.
 
@@ -9,7 +9,7 @@ npm ci
 npm run dev
 ```
 
-No credentials are required for the current shell. Copy `.env.example` to `.env.local` when implementing integrations; fill values securely. Only the Supabase URL and anon key are public. Keep the service role key and API/worker credentials server-only. Auth, RLS, storage and external services are not configured in this step.
+Public pages and offline tests require no credentials. Copy `.env.example` to `.env.local` and configure the Supabase URL and anon key to use authentication; see [Supabase setup](docs/supabase.md) for migration and email settings. Fill values securely. Only the Supabase URL and anon key are public. Keep the service role key and API/worker credentials server-only. The database migration must be applied to your Supabase project. Storage and other external integrations are future steps.
 
 ```sh
 npm run lint

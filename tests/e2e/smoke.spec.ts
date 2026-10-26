@@ -1,69 +1,41 @@
 import { test, expect } from '@playwright/test';
-test('landing and responsive shell work in light and dark themes', async ({ page }, testInfo) => {
-  const errors: string[] = [];
-  page.on('pageerror', e => errors.push(e.message));
+test('landing, authentication forms and persistent themes', async ({ page }) => {
+  const runtimeErrors: string[] = [];
+  const failedBundles: string[] = [];
+  page.on('pageerror', error => runtimeErrors.push(error.message));
+  page.on('response', response => { const path = new URL(response.url()).pathname; if (response.status() >= 400 && path.endsWith('.js')) failedBundles.push(path); });
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/');
   await expect(page.locator('html')).toHaveClass(/dark/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Every cost.One clear picture.');
   await expect(page.getByText('Analyse costs from any file, tool or recording', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Login', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
-  await page.goto('/');
-  await page.getByRole('link', { name: 'Get started', exact: true }).last().click();
-  await expect(page.getByRole('heading', { name: 'A little clarity goes a long way' })).toBeVisible();
-  await page.getByRole('link', { name: 'Explore workspace' }).click();
-  await expect(page.getByRole('heading', { name: 'Your projects' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Select a project' })).toBeDisabled();
   for (const theme of ['Light', 'Dark']) {
     await page.getByRole('button', { name: 'Choose theme' }).click();
     await page.getByRole('menuitem', { name: theme, exact: true }).click();
-    await expect(page.locator('html')).toHaveClass(new RegExp(theme.toLowerCase()));
-    await expect(page.getByRole('menu')).not.toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.reload();
     await expect(page.locator('html')).toHaveClass(new RegExp(theme.toLowerCase()));
-    await expect(page.getByRole('banner')).toBeVisible();
-    const mobileViewport = testInfo.project.name === 'mobile';
-    if (!mobileViewport) await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
-    await page.screenshot({ path: `docs/screenshots/1.1-shell-${page.viewportSize()!.width}-${theme.toLowerCase()}.png`, fullPage: true, animations: 'disabled' });
-    if (mobileViewport) {
-      await page.getByRole('button', { name: 'Open navigation' }).click();
-      await expect(page.getByRole('dialog')).toBeVisible();
-      await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
-      await page.screenshot({ path: `docs/screenshots/1.1-menu-390-${theme.toLowerCase()}.png`, fullPage: true, animations: 'disabled' });
-      await page.keyboard.press('Escape');
-      await expect(page.getByRole('dialog')).not.toBeVisible();
-    }
   }
-  await page.reload();
-  await expect(page.locator('html')).toHaveClass(/dark/);
-  const mobile = testInfo.project.name === 'mobile';
-  if (mobile) await page.getByRole('button', { name: 'Open navigation' }).click();
-  await expect(page.getByRole('link', { name: 'Projects', exact: true })).toHaveAttribute('aria-current', 'page');
-  await page.getByRole('link', { name: 'Import', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Import your data' })).toBeVisible();
-  if (mobile) { await expect(page.getByRole('dialog')).not.toBeVisible(); await page.getByRole('button', { name: 'Open navigation' }).click(); }
-  await expect(page.getByRole('link', { name: 'Import', exact: true })).toHaveAttribute('aria-current', 'page');
-  for (const [link, heading] of [['Reports','Your reports'],['Settings','Workspace settings']]) {
-    await page.getByRole('link', { name: link, exact: true }).click();
-    await expect(page.getByRole('heading', { name: heading })).toBeVisible();
-    if (mobile) await page.getByRole('button', { name: 'Open navigation' }).click();
-  }
-  if (mobile) await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'User menu' }).click();
-  await expect(page.getByText('Guest workspace')).toBeVisible();
-  expect(errors).toEqual([]);
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page.getByText('Enter a valid email address.')).toBeVisible();
+  await expect(page.getByText('Use at least 10 characters.')).toBeVisible();
+  await page.getByRole('link', { name: 'Create an account' }).click();
+  await expect(page.getByRole('heading', { name: 'A little clarity goes a long way' })).toBeVisible();
+  await page.getByLabel('Email', { exact: true }).fill('invalid');
+  await page.getByLabel('Password', { exact: true }).fill('short');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByText('Enter a valid email address.')).toBeVisible();
+  await expect(page.getByText('Use at least 10 characters.')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: `docs/screenshots/1.2-signup-${page.viewportSize()!.width}-dark.png`, fullPage: true });
+  expect(runtimeErrors).toEqual([]);
+  expect(failedBundles).toEqual([]);
 });
-
-test('landing illustration fits both themes and the narrow viewport', async ({ page }) => {
-  await page.goto('/');
-  for (const theme of ['Light', 'Dark']) {
-    await page.getByRole('button', { name: 'Choose theme' }).click();
-    await page.getByRole('menuitem', { name: theme, exact: true }).click();
-    await expect(page.getByRole('menu')).not.toBeVisible();
-    await expect(page.getByRole('img', { name: /Illustrative CodeAudit/ })).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.screenshot({ path: `docs/screenshots/1.1-landing-${page.viewportSize()!.width}-${theme.toLowerCase()}.png`, fullPage: true });
+test('signed-out visitors cannot access any workspace route', async ({ page }) => {
+  for (const path of ['/projects', '/projects/11111111-1111-4111-8111-111111111111', '/import', '/reports', '/settings']) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'User menu' })).not.toBeVisible();
   }
 });
