@@ -1,4 +1,4 @@
- schemaname |     tablename     | rowsecurity 
+ schemaname |     tablename     | rowsecurity
 ------------+-------------------+-------------
  public     | ai_cache          | t
  public     | cost_items        | t
@@ -7,7 +7,7 @@
  public     | projects          | t
 (5 rows)
 
- schemaname |     tablename     |       policyname        |      roles      | cmd |                                            qual                                             |                                         with_check                                          
+ schemaname |     tablename     |       policyname        |      roles      | cmd |                                            qual                                             |                                         with_check
 ------------+-------------------+-------------------------+-----------------+-----+---------------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------
  public     | cost_items        | cost_items_owner        | {authenticated} | ALL | (EXISTS ( SELECT 1                                                                         +| (EXISTS ( SELECT 1                                                                         +
             |                   |                         |                 |     |    FROM projects p                                                                         +|    FROM projects p                                                                         +
@@ -18,4 +18,3 @@
  public     | mapping_templates | mapping_templates_owner | {authenticated} | ALL | (owner_id = ( SELECT auth.uid() AS uid))                                                    | (owner_id = ( SELECT auth.uid() AS uid))
  public     | projects          | projects_owner          | {authenticated} | ALL | (owner_id = ( SELECT auth.uid() AS uid))                                                    | (owner_id = ( SELECT auth.uid() AS uid))
 (4 rows)
-
