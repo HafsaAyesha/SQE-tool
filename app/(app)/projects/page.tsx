@@ -1,6 +1,14 @@
-import Link from 'next/link';
-import { ArrowUpRight, Plus } from 'lucide-react';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { listProjects } from '@/lib/projects/data';
 import { PageHeader } from '@/components/costlens/PageHeader';
 import { EmptyState } from '@/components/costlens/EmptyState';
-import { Button } from '@/components/ui/button';
-export default function ProjectsPage() { return <><PageHeader title="Your projects" description="Big picture clarity. Down to the last detail." action={<Button asChild><Link href="/signup"><Plus/>New project</Link></Button>}/><EmptyState title="Every great project starts with a clear picture" description="Bring your estimated and actual costs together. Your first project will appear here." action={<Button asChild><Link href="/signup">Get started<ArrowUpRight/></Link></Button>}/><p className="text-center text-xs text-muted-foreground">CSV, spreadsheets, documents, recordings — all roads lead to clarity.</p></>; }
+import { ProjectDialog } from '@/components/costlens/ProjectDialog';
+import { ProjectCard } from '@/components/costlens/ProjectCard';
+export default async function ProjectsPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+  const projects = await listProjects(user.id);
+  return <><PageHeader title="Your projects" description="Big picture clarity. Down to the last detail." action={<ProjectDialog/>}/>{projects.length === 0 ? <EmptyState title="Create your first project" description="Give your costs a home. Start a project, add your estimates and actuals, and see the full picture." action={<ProjectDialog triggerLabel="Create your first project"/>}/> : <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">{projects.map(project => <ProjectCard key={project.id} project={project}/>)}</div>}</>;
+}

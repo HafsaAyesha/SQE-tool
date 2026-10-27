@@ -1,0 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
+export function KpiCard({ title, value, caption, icon: Icon, tone = 'neutral' }: { title: string; value: string; caption: string; icon: LucideIcon; tone?: 'neutral' | 'over' | 'under' }) {
+  return <section aria-label={title} className="min-w-0 rounded-2xl border bg-card p-4 sm:p-5 shadow-sm"><div className="flex items-center justify-between gap-2"><h2 className="text-sm font-medium text-muted-foreground">{title}</h2><span className="rounded-lg bg-accent p-2 text-accent-foreground"><Icon className="size-4" aria-hidden="true"/></span></div><p className={`mt-4 break-words text-xl font-semibold sm:text-2xl tracking-tight tabular-nums ${tone === 'over' ? 'text-over' : tone === 'under' ? 'text-under' : ''}`}>{value}</p><p className="mt-2 text-xs leading-5 text-muted-foreground">{caption}</p></section>;
+}

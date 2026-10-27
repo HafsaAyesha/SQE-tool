@@ -14,7 +14,7 @@
    The `/auth/confirm` route validates the token through Supabase, saves session cookies, and redirects to `/projects`. Invalid/expired links return to login with a friendly error. The default Supabase confirmation template can still verify the email at Supabase, but the user may need to return and log in manually. Configure SMTP as appropriate for your deployment; hosted default email limits apply.
 5. Run `npm run build` and start the application. Verify signup with a real inbox, email confirmation, login, email displayed in the user menu, logout, and signed-out redirects from `/projects`, `/import`, `/reports`, `/settings`, and nested project URLs.
 
-No project creation UI is included in Step 1.2. The schema and policies now support user-owned projects; project creation belongs to a later step. Test project rows through Supabase SQL Editor or an authenticated client when validating the hosted database.
+Step 1.3 now provides project creation and manual cost-entry screens; apply its additional migration below. Use the UI or an authenticated client to validate hosted ownership.
 
 ## Ownership contract for future steps
 
@@ -55,3 +55,17 @@ The local runner captures CLI status privately and passes generated local keys d
 For an already-migrated hosted test project, securely configure `NEXT_PUBLIC_SUPABASE_URL` (the origin, without `/rest/v1/`), `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`, then run `npm run test:rls`. This command fails rather than skips if configuration is missing. Plain `npm run test` skips the four live tests when no connection is configured and reports them separately. The admin key is used for fixture setup/cleanup only. All application RLS assertions use anon-key clients with independent user sessions. Never reuse the privileged keys posted in chat; rotate them in Supabase and enter replacements securely.
 
 Catalog queries are in `docs/rls-inspection.sql`. Actual fresh-local query output is saved in `docs/1.2-rls-query-results.txt`. This proves local migration and RLS readiness, not migration or authentication on the hosted project.
+
+## Step 1.3 migration and screen setup
+
+Apply `supabase/migrations/0002_project_summaries.sql` after `0001_init.sql` before opening the project list. Locally, run:
+
+```sh
+SUPABASE_HOME=/workspace/.supabase-cli SUPABASE_USE_SLIM_IMAGES=true npx supabase migration up --local
+```
+
+For the hosted project, use the SQL Editor or your normal migration deployment workflow. The new view requires Postgres 15+ for security_invoker (the local project uses Postgres 17). It introduces no tables or new secrets, and preserves all existing owner policies. Project creation, rename/delete and manual row editing now work in the UI. Project currency is selected at creation and is kept fixed during rename; manual rows inherit it on the server.
+
+The `type: 'manual'` shared row field is derived from `source_id = null`; there is no extra cost_items.type column or manual data_sources record. Existing imported rows retain their source_id and currency during edits. The shared CostRow model maps the database grp/source_ref fields to group/sourceRef. Project cards aggregate matching-currency values and flag rows in other currencies rather than summing different units.
+
+All project-specific server mutations call requireProject, and row changes also filter by project_id and row id. The project switcher and cards load only the current owner's projects. New pages inherit the auth guard, loading skeleton and themes from the existing shell.

@@ -1,0 +1,41 @@
+{
+  "project": "CodeAudit",
+  "tables": {
+    "costs": [
+      {
+        "Item": "Development",
+        "Group": "Build",
+        "Category": "Labour",
+        "Estimated": 3000,
+        "Actual": 2800,
+        "Currency": "USD",
+        "Date": "2026-10-01"
+      },
+      {
+        "Item": "Cloud hosting",
+        "Group": "Build",
+        "Category": "Cloud",
+        "Estimated": 100,
+        "Actual": 80,
+        "Currency": "USD",
+        "Date": "2026-10-02"
+      },
+      {
+        "Item": "AI API",
+        "Group": "Test",
+        "Category": "AI API",
+        "Estimated": 200,
+        "Actual": 250,
+        "Currency": "USD",
+        "Date": "2026-10-03"
+      }
+    ],
+    "tools": [
+      {
+        "Item": "Licenses",
+        "Estimated": 50,
+        "Actual": 40
+      }
+    ]
+  }
+}

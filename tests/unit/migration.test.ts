@@ -18,6 +18,8 @@ beforeAll(async () => {
     grant usage on schema auth to authenticated, anon;
     insert into auth.users values ('${alice}'), ('${bob}');`);
   await db.exec(readFileSync('supabase/migrations/0001_init.sql', 'utf8'));
+  await db.exec(readFileSync('supabase/migrations/0002_project_summaries.sql', 'utf8'));
+  await db.exec(readFileSync('supabase/migrations/0003_online_source_config.sql', 'utf8'));
 }, 30000);
 afterAll(async () => { await db.close(); });
 describe.sequential('migration and Postgres ownership policies', () => {
@@ -80,10 +82,20 @@ describe.sequential('migration and Postgres ownership policies', () => {
     await db.exec('reset role; grant select on projects, data_sources, cost_items, mapping_templates to anon; set role anon');
     for (const table of ['projects', 'data_sources', 'cost_items', 'mapping_templates']) expect((await db.query(`select * from ${table}`)).rows).toHaveLength(0);
   });
+  it('summary view applies caller RLS and aggregates only the project currency', async () => {
+    await asUser(alice);
+    await db.query("insert into cost_items(project_id,item,actual,currency) values ($1,'Other currency',999,'EUR')", [project]);
+    const rows = (await db.query<{id: string; total_actual: string; item_count: number; other_currency_count: number; owner_id: string}>('select * from project_summaries')).rows;
+    expect(rows.every(row => row.owner_id === alice)).toBe(true);
+    expect(rows.find(row => row.id === project)).toMatchObject({ total_actual: '14.00', item_count: 2, other_currency_count: 1 });
+    await asUser(bob);
+    expect((await db.query<{owner_id: string}>('select * from project_summaries')).rows.every(row => row.owner_id === bob)).toBe(true);
+    expect((await db.query('select * from project_summaries where id = $1', [project])).rows).toHaveLength(0);
+  });
   it('allows owner deletes, preserves costs on source deletion and cascades project deletion', async () => {
     await asUser(alice);
     await db.query('delete from data_sources where id = $1', [source]);
-    expect((await db.query<{source_id: string | null}>('select source_id from cost_items')).rows[0].source_id).toBeNull();
+    expect((await db.query<{source_id: string | null}>('select source_id from cost_items')).rows.every(row => row.source_id === null)).toBe(true);
     await db.query('delete from projects where id = $1', [project]);
     expect((await db.query('select * from cost_items')).rows).toHaveLength(0);
     expect((await db.query('delete from mapping_templates returning id')).rows).toHaveLength(1);

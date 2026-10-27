@@ -27,7 +27,7 @@ test('landing, authentication forms and persistent themes', async ({ page }) => 
   await expect(page.getByText('Enter a valid email address.')).toBeVisible();
   await expect(page.getByText('Use at least 10 characters.')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.screenshot({ path: `docs/screenshots/1.2-signup-${page.viewportSize()!.width}-dark.png`, fullPage: true });
+  if (process.env.COSTLENS_CAPTURE_SCREENSHOTS === '1') await page.screenshot({ path: `docs/screenshots/1.2-signup-${page.viewportSize()!.width}-dark.png`, fullPage: true });
   expect(runtimeErrors).toEqual([]);
   expect(failedBundles).toEqual([]);
 });

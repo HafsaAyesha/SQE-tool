@@ -1,0 +1,4 @@
+Item,Group,Category,Estimated,Actual,Currency,Date
+Development,Build,Labour,3000,2800,USD,2026-10-01
+Cloud hosting,Build,Cloud,100,80,USD,2026-10-02
+AI API,Test,AI API,200,250,USD,2026-10-03

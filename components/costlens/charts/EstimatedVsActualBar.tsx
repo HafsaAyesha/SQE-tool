@@ -1,0 +1,10 @@
+'use client';
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ChartFrame, ChartTooltip, InteractiveBar, SummaryData, chartMoney, shortLabel, type ChartDatum } from './shared';
+export function EstimatedVsActualBar({ data, currency, dimension = 'category', onSelect }: { data: ChartDatum[]; currency: string; dimension?: string; onSelect?: (key: string) => void }) {
+  const visible = data.slice(0,20);
+  return <ChartFrame title="Estimated vs actual" description={`Compare planned and recorded spend by ${dimension}.${onSelect?" Select a bar to focus the table.":""}`} footer={<SummaryData data={data} currency={currency}/>}>
+    <div className="h-72 min-w-0" data-chart="estimated-actual"><ResponsiveContainer width="100%" height="100%" initialDimension={{width:600,height:288}}><BarChart data={visible} accessibilityLayer margin={{top:12,right:8,left:0,bottom:12}}><CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false}/><XAxis dataKey="label" tickFormatter={shortLabel} tick={{fill:'var(--muted-foreground)',fontSize:11}} axisLine={false} tickLine={false} interval="preserveStartEnd"/><YAxis width={65} tickFormatter={value=>chartMoney(Number(value),currency)} tick={{fill:'var(--muted-foreground)',fontSize:11}} axisLine={false} tickLine={false}/><Tooltip content={<ChartTooltip currency={currency}/>} cursor={{fill:'var(--muted)',opacity:.5}}/><Legend wrapperStyle={{fontSize:12,paddingTop:12}}/><Bar dataKey="estimated" name="Estimated" fill="var(--chart-estimated)" maxBarSize={38} isAnimationActive={false} shape={(props:unknown)=><InteractiveBar shape={props} onSelect={onSelect} metric="Estimated"/>}/><Bar dataKey="actual" name="Actual" fill="var(--chart-actual)" maxBarSize={38} isAnimationActive={false} shape={(props:unknown)=><InteractiveBar shape={props} onSelect={onSelect} metric="Actual"/>}/></BarChart></ResponsiveContainer></div>
+    {data.length>20 && <p className="mt-3 text-xs text-muted-foreground">Showing the first 20 of {data.length} keys. Filter to compare a smaller set; all keys remain in chart data.</p>}
+  </ChartFrame>;
+}

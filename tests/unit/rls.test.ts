@@ -80,4 +80,17 @@ describe.skipIf(!configured && !required).sequential('live Supabase RLS with two
     expect(queryError).toBeNull();
     expect(existing).toEqual([]);
   });
+  it('summary totals include more than 1000 costs and stay invisible to B', async () => {
+    const { error: insertError } = await clientA.from('cost_items').insert(Array.from({ length: 1005 }, (_, i) => ({ project_id: projectId, item: `Summary fixture ${i}`, estimated: 2, actual: 1, currency: 'USD', source_id: null })));
+    expect(insertError).toBeNull();
+    const { data, error } = await clientA.from('project_summaries').select('item_count,total_estimated,total_actual').eq('id', projectId).single();
+    expect(error).toBeNull();
+    expect(data?.item_count).toBe(1006);
+    expect(Number(data?.total_estimated)).toBe(2010);
+    expect(Number(data?.total_actual)).toBe(1017.5);
+    const other = await clientB.from('project_summaries').select('id').eq('id', projectId);
+    expect(other.error).toBeNull();
+    expect(other.data).toEqual([]);
+  }, 15000);
+
 });
