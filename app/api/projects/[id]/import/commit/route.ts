@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { enforceRateLimit, rateLimitResponse } from '@/lib/security/rateLimit';
 import { revalidatePath } from 'next/cache';
 import { requireProject } from '@/lib/supabase/requireProject';
 import { createClient } from '@/lib/supabase/server';
@@ -11,7 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const headers = { 'Cache-Control': 'private, no-store' };
   const fail = (error: string, status = 400) => NextResponse.json({ error }, { status, headers });
   try {
-    const { id } = await params; await requireProject(id);
+    const { id } = await params; const project=await requireProject(id); await enforceRateLimit('import',project.owner_id);
     if (!request.headers.get('content-type')?.startsWith('application/json')) return fail('Send confirmed rows as JSON.');
     if (Number(request.headers.get('content-length')) > LIMIT) return fail('The confirmed import is too large.', 413);
     if (!request.body) return fail('No confirmed rows were received.');
@@ -29,6 +30,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     revalidatePath('/projects'); revalidatePath(`/projects/${id}`);
     return NextResponse.json(result, { headers });
   } catch (error) {
+    const limited=rateLimitResponse(error);if(limited)return limited;
     if (typeof error === 'object' && error && 'digest' in error && error.digest === 'NEXT_HTTP_ERROR_FALLBACK;404') return fail('Project not found.', 404);
     console.error('Import commit failed', { errorType: error instanceof Error ? error.name : 'unknown' });
     return fail('We could not save this import. Please try again.', 500);

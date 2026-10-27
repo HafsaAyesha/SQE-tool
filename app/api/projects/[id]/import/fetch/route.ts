@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { enforceRateLimit, rateLimitResponse } from '@/lib/security/rateLimit';
 import { requireProject } from '@/lib/supabase/requireProject';
 import { createClient } from '@/lib/supabase/server';
 import { onlineRequestSchema } from '@/lib/import/onlineSchema';
@@ -21,7 +22,7 @@ async function body(request: Request) {
 }
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params; await requireProject(id);
+    const { id } = await params; const project=await requireProject(id); await enforceRateLimit('import',project.owner_id);
     const parsed = onlineRequestSchema.safeParse(await body(request));
     if (!parsed.success) throw new ImportError(parsed.error.issues[0].message);
     const input = parsed.data;
@@ -44,6 +45,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     return NextResponse.json(parseResponseSchema.parse({ ...table, rows: new URL(request.url).searchParams.get('full') === 'true' ? table.rows : table.rows.slice(0, PREVIEW_ROWS), totalCount: table.rows.length, previewLimit: PREVIEW_ROWS, ...(sourceId ? { sourceId } : {}) }), { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
+    const limited=rateLimitResponse(error);if(limited)return limited;
     const digest = typeof error === 'object' && error !== null && 'digest' in error ? error.digest : undefined;
     const status = digest === 'NEXT_HTTP_ERROR_FALLBACK;404' ? 404 : error instanceof ImportError ? error.status : 500;
     const message = status === 404 ? 'Project not found.' : error instanceof ImportError ? error.message : 'We could not fetch this source. Please try again.';

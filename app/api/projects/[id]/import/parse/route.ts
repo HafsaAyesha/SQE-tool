@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { enforceRateLimit, rateLimitResponse } from '@/lib/security/rateLimit';
 import { z } from 'zod';
 import { requireProject } from '@/lib/supabase/requireProject';
 import { getAdapter, getAdapterFor } from '@/lib/import/registry';
@@ -28,7 +29,7 @@ async function boundedBody(request: Request) {
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    await requireProject(id);
+    const project=await requireProject(id); await enforceRateLimit('import',project.owner_id);
     const contentType = request.headers.get('content-type') ?? '';
     if (!contentType.toLowerCase().startsWith('multipart/form-data;')) throw new ImportError('Send a file using the upload or paste form.');
     let form: FormData;
@@ -46,6 +47,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const result = parseResponseSchema.parse({ ...table, rows: form.get('full') === 'true' ? table.rows : table.rows.slice(0, PREVIEW_ROWS), totalCount: table.rows.length, previewLimit: PREVIEW_ROWS });
     return NextResponse.json(result, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
+    const limited=rateLimitResponse(error);if(limited)return limited;
     const digest = typeof error === 'object' && error !== null && 'digest' in error ? error.digest : undefined;
     if (digest === 'NEXT_HTTP_ERROR_FALLBACK;404') return NextResponse.json({ error: 'Project not found.' }, { status: 404, headers: { 'Cache-Control': 'private, no-store' } });
     if (error instanceof ImportError) return NextResponse.json({ error: error.message }, { status: error.status, headers: { 'Cache-Control': 'private, no-store' } });

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ config: vi.fn(), login: vi.fn(), signup: vi.fn(), signout: vi.fn() }));
+vi.mock('@/lib/security/rateLimit',()=>({enforceRateLimit:vi.fn(),rateLimitResponse:()=>null,loginIdentifier:()=> 'test-ip',RateLimitError:class extends Error{},RateLimitUnavailableError:class extends Error{}}));
+vi.mock('next/headers',()=>({headers:async()=>new Headers()}));
 vi.mock('@/lib/supabase/config', () => ({ getSupabaseConfig: mocks.config }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ auth: { signInWithPassword: mocks.login, signUp: mocks.signup, signOut: mocks.signout } }) }));
 vi.mock('next/navigation', () => ({ redirect: (path: string) => { throw new Error(`REDIRECT:${path}`); } }));

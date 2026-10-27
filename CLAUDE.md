@@ -64,6 +64,7 @@ CONVENTIONS
 - Security is built in, not added later: validate on the server with Zod, check project ownership on every query, never expose secrets to the client, never execute or store raw uploaded files longer than needed.
 - Every project-scoped server route must call `requireProject(projectId)` from `/lib/supabase/requireProject.ts` before reading or writing project data; use the user-scoped Supabase server client and retain RLS.
 - Routine validation does not generate screenshots unless I explicitly request them; existing captures are preserved.
+- All Claude requests must use server-only `lib/ai/client.ts` → `callClaude`; never import the Anthropic SDK elsewhere. Project AI features must pass the authorized projectId. Do not bypass privacy preferences, quotas, schema validation or usage auditing.
 - Pure logic lives in /lib and is unit-tested; components stay thin.
 - Every importer registers itself in /lib/import/registry.ts, so the import wizard picks it up automatically.
 - Errors shown to users are friendly; details are logged on the server only.

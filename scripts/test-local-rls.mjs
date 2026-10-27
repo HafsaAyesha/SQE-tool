@@ -1,6 +1,7 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { startLocalRedis } from './local-redis.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const env = { ...process.env, SUPABASE_HOME: process.env.SUPABASE_HOME || '/workspace/.supabase-cli', SUPABASE_USE_SLIM_IMAGES: 'true' };
 let status;
@@ -23,7 +24,14 @@ const commands = process.argv.includes('--e2e') ? ['test:e2e'] : process.argv.in
 if (process.argv.includes('--browser') || process.argv.includes('--e2e')) testEnv.COSTLENS_LOCAL_AUTH_E2E = '1';
 const separator = process.argv.indexOf('--');
 const testArgs = separator === -1 ? [] : process.argv.slice(separator + 1);
-for (const command of commands) {
-  const result = spawnSync('npm', ['run', command, ...(command === 'test:e2e' && testArgs.length ? ['--', ...testArgs] : [])], { cwd: root, stdio: 'inherit', env: testEnv });
-  if (result.status !== 0) process.exit(result.status ?? 1);
-}
+const localRedis=await startLocalRedis();
+Object.assign(testEnv,localRedis.env);
+let exitCode=0;
+try { for (const command of commands) {
+  const code=await new Promise((resolve,reject)=>{
+    const child=spawn('npm',['run',command,...(command==='test:e2e'&&testArgs.length?['--',...testArgs]:[])],{cwd:root,stdio:'inherit',env:testEnv});
+    child.once('error',reject);child.once('exit',code=>resolve(code??1));
+  });
+  if(code!==0){exitCode=code;break;}
+}} finally {await localRedis.close();}
+process.exitCode=exitCode;

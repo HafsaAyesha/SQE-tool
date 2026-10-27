@@ -1,17 +1,20 @@
 'use server';
+import { headers } from 'next/headers';
+import { enforceRateLimit, loginIdentifier, RateLimitError, RateLimitUnavailableError } from '@/lib/security/rateLimit';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { authSchema } from '@/lib/auth/schema';
 import { getSupabaseConfig } from '@/lib/supabase/config';
 import { createClient } from '@/lib/supabase/server';
-export type AuthResult = { error?: string; message?: string };
-export async function authenticate(mode: unknown, input: unknown): Promise<AuthResult> {
+export type AuthResult = { error?: string; message?: string; success?:boolean; status?:number; retryAfter?:number };
+export async function authenticate(mode: unknown, input: unknown, redirectOnSuccess = true): Promise<AuthResult> {
   const parsedMode = z.enum(['login', 'signup']).safeParse(mode);
   const parsed = authSchema.safeParse(input);
   if (!parsedMode.success || !parsed.success) return { error: 'Enter a valid email and a password of at least 10 characters.' };
   if (!getSupabaseConfig()) return { error: 'Sign-in is not configured yet. Please contact the workspace administrator.' };
   let signedIn = false;
   try {
+    await enforceRateLimit('login',loginIdentifier(await headers()));
     const supabase = await createClient();
     const { data, error } = parsedMode.data === 'login'
       ? await supabase.auth.signInWithPassword(parsed.data)
@@ -21,11 +24,13 @@ export async function authenticate(mode: unknown, input: unknown): Promise<AuthR
       return { error: parsedMode.data === 'login' ? 'Unable to sign in. Check your email and password, and confirm your email if needed.' : 'Unable to create your account. Try again later or sign in if you already have an account.' };
     }
     signedIn = Boolean(data.session);
-  } catch {
+  } catch (error) {
+    if(error instanceof RateLimitError)return {error:error.message,status:429,retryAfter:error.retryAfter};
+    if(error instanceof RateLimitUnavailableError)return {error:error.message,status:503};
     console.error('Authentication service unavailable');
     return { error: 'We could not reach the sign-in service. Please try again shortly.' };
   }
-  if (signedIn) redirect('/projects');
+  if (signedIn) {if(redirectOnSuccess)redirect('/projects');return {success:true};}
   return { message: 'Check your email for a confirmation link, then return here to sign in.' };
 }
 export async function signOut(): Promise<AuthResult> {

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 const mocks = vi.hoisted(() => ({ requireProject: vi.fn(), safeFetch: vi.fn(), from: vi.fn(), insert: vi.fn(), update: vi.fn(), eq: vi.fn(), select: vi.fn(), single: vi.fn() }));
+vi.mock('@/lib/security/rateLimit',()=>({enforceRateLimit:vi.fn(),rateLimitResponse:()=>null,loginIdentifier:()=> 'test-ip',RateLimitError:class extends Error{},RateLimitUnavailableError:class extends Error{}}));
+vi.mock('next/headers',()=>({headers:async()=>new Headers()}));
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/supabase/requireProject', () => ({ requireProject: mocks.requireProject }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ from: mocks.from }) }));

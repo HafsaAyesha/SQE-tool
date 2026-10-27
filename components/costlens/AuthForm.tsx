@@ -6,7 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { ArrowRight, LoaderCircle } from 'lucide-react';
 import { authSchema, type AuthInput } from '@/lib/auth/schema';
-import { authenticate } from '@/app/(auth)/actions';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const form = useForm<AuthInput>({ resolver: zodResolver(authSchema), defaultValues: { email: '', password: '' } });
   async function onSubmit(values: AuthInput) {
     setFeedback({});
-    const result = await authenticate(mode, values);
+    let result: {error?:string;message?:string;success?:boolean};
+    try {const response=await fetch('/api/auth/authenticate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,...values})});result=await response.json();}
+    catch {result={error:'We could not reach the sign-in service. Please try again.'};}
+    if(result.success){window.location.assign('/projects');return;}
     setFeedback(result);
     if (result.error) toast.error(result.error);
     if (result.message) { toast.success(result.message); form.resetField('password'); }
