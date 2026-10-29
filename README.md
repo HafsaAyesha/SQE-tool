@@ -71,6 +71,8 @@ npm run typecheck
 npx vitest run tests/unit/demo.test.ts tests/unit/mediaMigration.test.ts tests/unit/aiClient.test.ts
 ```
 
+The Next.js production typecheck excludes tests and the separate worker package. To typecheck test files as well, first install worker dependencies with `npm --prefix worker ci`, then run `npm run typecheck:tests`. Render builds/typechecks the worker using its own configuration; Vercel does not need Express installed in the app.
+
 For explicit phase checks, the available commands are:
 
 ```sh
