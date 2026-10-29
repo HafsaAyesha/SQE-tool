@@ -15,13 +15,18 @@ flowchart LR
     V --> S
     V --> R[Upstash Redis: request limits and daily quotas]
     V -->|One guarded server-only AI gateway| G[Gemini API]
-    V -->|HMAC-signed jobs| W[Render: Node 20 + ffmpeg worker]
+    V -->|WORKER_SERVICE_URL binding| GW[Vercel: internal Express gateway]
+    GW -->|HMAC-signed jobs| W[Render: Node 20 + ffmpeg worker]
     W -->|Job-specific signed download URL| S
     W -->|Timestamped speech transcription| O[OpenAI Whisper]
     W -->|HMAC transcript/frame callback| V
 ```
 
-Gemini replaces Claude/Anthropic at the project owner's request. `callClaude` remains a compatibility alias to the same Gemini gateway, not a second provider. The worker does not hold a database service key or call Gemini directly. The app owns authorization, privacy, quota checks, validation, usage recording and AI caching.
+Gemini replaces Claude/Anthropic at the project owner's request. `callClaude` remains a compatibility alias to the same Gemini gateway, not a second provider. The external Render processor does not hold a database service key or call Gemini directly. The Vercel gateway shares the app project’s environment but forwards only signed jobs. The app owns authorization, privacy, quota checks, validation, usage recording and AI caching.
+
+## Vercel services configuration
+
+The root `vercel.json` configures the confirmed public Next.js service `costlens` and internal Express gateway `worker`. The caller receives `WORKER_SERVICE_URL` automatically—never set it manually. Long-running media processing stays on Render. See [service routing, environment and dev instructions](docs/vercel-services.md). Use authenticated `vercel dev` to run both Vercel services locally; plain `npm run dev` retains the direct-to-Render fallback and does not test bindings.
 
 ## Local setup
 
@@ -51,7 +56,7 @@ Run the separate worker using [worker/README.md](worker/README.md). It needs Nod
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | App: REST credentials for production request limits. |
 | `SOURCE_ENCRYPTION_KEY` | App: base64 of 32 random bytes for saved online-source configurations; preserve the key to keep saved sources readable. |
 | `APP_URL` | App/worker/seed/verifier: canonical HTTPS CostLens origin, not the Supabase URL. |
-| `WORKER_URL` | App/seed/verifier: canonical Render worker HTTPS origin. |
+| `WORKER_URL` | Gateway/legacy app/seed/verifier: canonical external Render processor HTTPS origin. |
 | `WORKER_SECRET` | App and worker: identical random server-only secret, at least 32 characters. |
 | `OPENAI_API_KEY` | Worker only: speech transcription. No Anthropic key is required. |
 | `TRUST_PROXY_HEADERS` | Optional app setting for a trusted proxy that overwrites forwarded IP headers; Vercel is detected automatically. |

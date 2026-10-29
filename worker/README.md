@@ -15,3 +15,7 @@ Users explicitly consent to sending their recording to the speech provider. When
 Temporary downloads, chunks and frames are removed after processing or failure. The private original stays available during review for timestamp playback and is removed after an idempotent, transactional commit. Failed and abandoned recordings expire within 24 hours; the worker's poll performs cleanup retries, including successfully committed jobs whose first deletion failed. The app cleans recordings before a project deletion, and refuses the project deletion if cleanup fails. Hosting the worker continuously is required for these cleanup sweeps.
 
 The two media fixtures are synthetic, reproducible speech and a narrated spreadsheet animation. `node scripts/create-media-fixtures.mjs` regenerates them with ffmpeg's flite filter and Sharp. They are not represented as a human voice recording.
+
+## Internal Vercel gateway
+
+The same package also provides `src/app.ts`, a request-scoped Express gateway for Vercel services. It forwards authenticated jobs/health to the external Render `WORKER_URL`; it does not import the background `src/server.ts`, run ffmpeg or require an OpenAI key. The Next.js caller receives its internal URL through `WORKER_SERVICE_URL`. No public rewrite targets the gateway. See [the services guide](../docs/vercel-services.md). The Docker/start commands above continue to run the real Render processor. The service names, routing and calling-service binding have been confirmed. Authenticated Vercel dev/deployment checks still require operator access.
