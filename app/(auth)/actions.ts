@@ -10,7 +10,7 @@ export type AuthResult = { error?: string; message?: string; success?:boolean; s
 export async function authenticate(mode: unknown, input: unknown, redirectOnSuccess = true): Promise<AuthResult> {
   const parsedMode = z.enum(['login', 'signup']).safeParse(mode);
   const parsed = authSchema.safeParse(input);
-  if (!parsedMode.success || !parsed.success) return { error: 'Enter a valid email and a password of at least 10 characters.' };
+  if (!parsedMode.success || !parsed.success || !z.boolean().safeParse(redirectOnSuccess).success) return { error: 'Enter a valid email and a password of at least 10 characters.' };
   if (!getSupabaseConfig()) return { error: 'Sign-in is not configured yet. Please contact the workspace administrator.' };
   let signedIn = false;
   try {
@@ -37,8 +37,10 @@ export async function signOut(): Promise<AuthResult> {
   if (!getSupabaseConfig()) redirect('/login');
   try {
     const supabase = await createClient();
+    const {data:{user}}=await supabase.auth.getUser();if(!user)redirect('/login');
+    await enforceRateLimit('mutation',user.id);
     const { error } = await supabase.auth.signOut();
     if (error) return { error: 'We could not sign you out. Please try again.' };
-  } catch { return { error: 'We could not reach the sign-in service. Please try again.' }; }
+  } catch(error) {if(typeof error==='object'&&error&&'digest'in error)throw error;if(error instanceof RateLimitError||error instanceof RateLimitUnavailableError)return {error:error.message};console.error('Sign out failed',{type:error instanceof Error?error.name:'unknown'});return { error: 'We could not reach the sign-in service. Please try again.' }; }
   redirect('/login');
 }

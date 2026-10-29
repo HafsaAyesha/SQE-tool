@@ -25,6 +25,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     const limited=rateLimitResponse(error);if(limited)return limited;
     if(typeof error==='object'&&error&&'digest' in error&&error.digest==='NEXT_HTTP_ERROR_FALLBACK;404')return fail('Project not found.',404);
     if(error instanceof AiError)return NextResponse.json({error:error.message},{status:error.status,headers:{...headers,...(error.retryAfter?{'Retry-After':String(error.retryAfter)}:{})}});
+    console.error('AI mapping failed',{type:error instanceof Error?error.name:'unknown'});
     return fail('AI mapping is temporarily unavailable. You can still map columns manually.',503);
   }
 }

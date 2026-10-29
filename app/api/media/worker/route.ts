@@ -1,3 +1,4 @@
+import {enforceRateLimit} from '@/lib/security/rateLimit';
 import {NextResponse} from 'next/server';
 import {z} from 'zod';
 import sharp from 'sharp';
@@ -17,6 +18,7 @@ export async function POST(request:Request){
  try{
   const raw=await readMediaJson(request,3500000),input=envelope.safeParse(JSON.parse(raw));if(!input.success)throw new ImportError('Invalid worker message.');
   const {jobId,timestamp,action}=input.data,{secret}=requireWorkerConfig();if(!verifyMedia(jobId,timestamp,request.headers.get('x-costlens-signature')??'',secret,action,raw))throw new ImportError('Invalid worker signature or expired timestamp.',401);
+  await enforceRateLimit('worker','authenticated-worker');
   const db=mediaStore(),headers={'Cache-Control':'private, no-store'};
   if(action==='poll'){
    const expired=await db.from('jobs').select('*').eq('cleanup_pending',true).or(`expires_at.lt.${new Date().toISOString()},and(status.eq.processing,updated_at.lt.${new Date(Date.now()-30*60*1000).toISOString()}),status.eq.done,status.eq.failed`).limit(20);

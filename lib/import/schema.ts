@@ -12,7 +12,7 @@ export const extractionEstimateSchema=z.object({units:z.number().int().min(1).ma
 export const sourcePreviewSchema=z.object({sourceRef:z.string().max(512),text:z.string().max(50000).optional(),thumbnail:z.string().max(500000).regex(/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/).optional()});
 export const rawTableSchema = z.object({
   columns: z.array(z.string().min(1).max(256)).min(1).max(256),
-  rows: z.array(z.record(z.unknown())).min(1).max(5000),
+  rows: z.array(z.record(z.string(),z.unknown())).min(1).max(5000),
   meta: z.object({ sourceType: z.string().min(1).max(80), fileName: z.string().max(255), sheet: z.string().max(256).optional(), warnings: z.array(z.string().max(1000)).max(100), fileHash:z.string().regex(/^[a-f0-9]{64}$/).optional(), ai:z.boolean().optional(),mediaJobId:z.string().uuid().optional(),playbackUrl:z.string().url().max(8192).optional(),mediaType:z.enum(['audio','video']).optional(), previews:z.array(sourcePreviewSchema).max(40).optional(), estimate:extractionEstimateSchema.optional(), sheets: z.array(z.string().max(256)).max(200).optional(), jsonPaths: z.array(z.string().max(1024)).max(100).optional(), tables: z.array(z.string().max(256)).max(100).optional(), tableIndex: z.number().int().min(0).max(99).optional() }),
 });
 export type RawTable = z.infer<typeof rawTableSchema>;

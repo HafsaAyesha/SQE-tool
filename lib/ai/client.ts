@@ -1,7 +1,6 @@
 import 'server-only';
 import { ProxyAgent } from 'undici';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { createClient } from '@/lib/supabase/server';
 import { requireProject } from '@/lib/supabase/requireProject';
 import { enforceAiLimits, RateLimitError, RateLimitUnavailableError } from '@/lib/security/rateLimit';
@@ -21,7 +20,7 @@ const mediaSchema=z.object({mimeType:z.enum(['application/pdf','image/png','imag
 const inputSchema=z.object({task:z.enum(['mapping','extraction','summary','anomaly','test']),system:z.string().min(1).max(16000),userContent:z.string().min(1).max(1024*1024).refine(value=>Buffer.byteLength(value,'utf8')<=1024*1024),maxTokens:z.number().int().min(1).max(8192).default(2048),model:z.string().max(120).optional(),projectId:z.string().uuid().optional(),media:z.array(mediaSchema).max(60).optional(),refresh:z.boolean().default(false),cacheOnly:z.boolean().default(false),cacheContext:z.string().min(1).max(256).optional()}).refine(value=>(value.media??[]).reduce((sum,part)=>sum+part.data.byteLength,0)<=10*1024*1024);
 export type AiTask=z.infer<typeof inputSchema>['task'];
 export type AiResult<T>={data:T;cached:boolean;model:string;inputTokens:number;outputTokens:number;generatedAt:string};
-type Options<T>={task:AiTask;system:string;userContent:string;schema:z.ZodType<T,z.ZodTypeDef,unknown>;maxTokens?:number;model?:'fast'|'smart'|string;projectId?:string;cacheOnly?:boolean;cacheContext?:string;refresh?:boolean;media?:AiMedia[]};
+type Options<T>={task:AiTask;system:string;userContent:string;schema:z.ZodType<T,unknown>;maxTokens?:number;model?:'fast'|'smart'|string;projectId?:string;cacheOnly?:boolean;cacheContext?:string;refresh?:boolean;media?:AiMedia[]};
 export function resolveModel(task:AiTask,requested?:string){
   const smart=process.env.GEMINI_MODEL_SMART||'gemini-flash-lite-latest',fast=process.env.GEMINI_MODEL_FAST||'gemini-flash-lite-latest';
   const chosen=requested==='fast'?fast:requested==='smart'?smart:requested??(task==='mapping'?fast:smart);
@@ -49,7 +48,7 @@ async function runAI<T>(options:Options<T>,workerActor?:{userId:string;projectId
     if(mask&&data.media?.length)throw new AiError('Visual documents cannot be masked reliably. Turn off personal-data masking in Settings before sending an image or scanned PDF, or upload a text-based export.',409);
     const protect=(text:string)=>mask?redactPersonalData(text):text;
     const content=protect(data.userContent),system=protect(data.system);
-    const schemaText=protect(JSON.stringify(zodToJsonSchema(options.schema as z.ZodTypeAny,{$refStrategy:'none'})));
+    const schemaText=protect(JSON.stringify(z.toJSONSchema(options.schema)));
     const hash=aiCacheKey(data.task,model,{userId:user.id,projectId:data.projectId??null,system,content,schema:schemaText,maxTokens:data.maxTokens,mask,...(data.cacheContext?{cacheContext:data.cacheContext}:{}),...(data.media?.length?{media:data.media.map(part=>({mimeType:part.mimeType,sourceRef:part.sourceRef,hash:aiCacheKey('media',part.mimeType,Buffer.from(part.data).toString('base64'))}))}:{})});
     const hit=data.refresh?null:await getAiCache(hash,controller.signal,{userId:user.id,projectId:data.projectId??null});check();
     if(hit!==null){const valid=await options.schema.safeParseAsync(hit.data);check();if(valid.success){cached=true;success=true;return {data:valid.data,cached:true,model,inputTokens:0,outputTokens:0,generatedAt:hit.createdAt};}}

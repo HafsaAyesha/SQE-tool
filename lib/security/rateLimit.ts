@@ -6,7 +6,7 @@ import type { Redis } from '@upstash/redis';
 import { createRedisClient } from './redis';
 import { Ratelimit } from '@upstash/ratelimit';
 import { NextResponse } from 'next/server';
-export type LimitKind='ai'|'import'|'login'|'dailyAi'|'report';
+export type LimitKind='ai'|'import'|'login'|'dailyAi'|'report'|'read'|'mutation'|'worker';
 export class RateLimitError extends Error {
   readonly status=429;
   constructor(public retryAfter:number,public kind:LimitKind){super(kind==='dailyAi'?'Your daily AI quota is used up. Please try again tomorrow.':'Too many requests. Please wait a little and try again.');this.name='RateLimitError';}
@@ -16,6 +16,9 @@ let cached:{url:string;token:string;limiters:ReturnType<typeof createLimiters>}|
 export function createLimiters(redis:Redis){
   const options={redis,analytics:false,ephemeralCache:false as const,timeout:0};
   return {
+    read:new Ratelimit({...options,prefix:'costlens:v1:read',limiter:Ratelimit.slidingWindow(240,'10 m')}),
+    mutation:new Ratelimit({...options,prefix:'costlens:v1:mutation',limiter:Ratelimit.slidingWindow(120,'10 m')}),
+    worker:new Ratelimit({...options,prefix:'costlens:v1:worker',limiter:Ratelimit.slidingWindow(600,'10 m')}),
     report:new Ratelimit({...options,prefix:'costlens:v1:report',limiter:Ratelimit.slidingWindow(10,'10 m')}),
     ai:new Ratelimit({...options,prefix:'costlens:v1:ai',limiter:Ratelimit.slidingWindow(20,'10 m')}),
     import:new Ratelimit({...options,prefix:'costlens:v1:import',limiter:Ratelimit.slidingWindow(30,'10 m')}),

@@ -29,8 +29,8 @@ export function parsePublicUrl(input: string) {
   if (!['http:', 'https:'].includes(url.protocol)) throw new ImportError('Only HTTP and HTTPS links are supported.');
   if (url.username || url.password) throw new ImportError('Do not put credentials in the URL. Use the optional API-key fields.');
   const hostname = url.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
-  if (!hostname || hostname.includes('%') || (!isIP(hostname) && (!hostname.includes('.') || /(?:^|\.)(?:localhost|local|internal|onion)$/.test(hostname)))) throw new ImportError('Only public internet addresses are allowed. Internal and metadata URLs are blocked.');
-  if (isIP(hostname) && !publicAddress(hostname)) throw new ImportError('Only public internet addresses are allowed. Private, loopback and metadata ranges are blocked.');
+  if (!hostname || hostname.includes('%') || (!isIP(hostname) && (!hostname.includes('.') || /(?:^|\.)(?:localhost|local|internal|onion)$/.test(hostname)))) throw new ImportError('URL not allowed. Only public internet addresses are allowed. Internal and metadata URLs are blocked.');
+  if (isIP(hostname) && !publicAddress(hostname)) throw new ImportError('URL not allowed. Only public internet addresses are allowed. Private, loopback and metadata ranges are blocked.');
   url.hash = '';
   return { url, hostname };
 }
@@ -62,7 +62,7 @@ export async function validatePublicUrl(input: string, signal: AbortSignal, reso
   try { addresses = isIP(hostname) ? [{ address: hostname, family: isIP(hostname) }] : await resolver(hostname, signal); }
   catch (error) { if (error instanceof ImportError) throw error; throw new ImportError('This host could not be resolved to a public address.'); }
   signal.throwIfAborted();
-  if (!addresses.length || addresses.some(answer => ![4, 6].includes(answer.family) || isIP(answer.address) !== answer.family || !publicAddress(answer.address))) throw new ImportError('Only public internet addresses are allowed. This host resolves to a blocked address.');
+  if (!addresses.length || addresses.some(answer => ![4, 6].includes(answer.family) || isIP(answer.address) !== answer.family || !publicAddress(answer.address))) throw new ImportError('URL not allowed. Only public internet addresses are allowed. This host resolves to a blocked address.');
   const address = addresses.find(answer => answer.family === 4) ?? addresses[0];
   return { url, address: address.address, family: address.family };
 }

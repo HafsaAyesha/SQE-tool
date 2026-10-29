@@ -2,7 +2,7 @@ import {test,expect} from './fixtures';
 import {createClient} from '@supabase/supabase-js';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {zodToJsonSchema} from 'zod-to-json-schema';
+import {z} from 'zod';
 import mammoth from 'mammoth';
 import {aiCacheKey} from '../../lib/ai/cacheKey';
 import {EXTRACTION_SYSTEM} from '../../lib/ai/extractionPrompt';
@@ -24,7 +24,7 @@ test('document fixtures: estimates, extraction, auto mapping, confidence/source 
   type Media={mimeType:'application/pdf'|'image/jpeg';sourceRef:string;data:Uint8Array};
   async function seed(segments:{sourceRef:string;text:string}[],media:Media[],result:unknown[]){
    const model=process.env.GEMINI_MODEL_SMART||'gemini-flash-lite-latest';const content=JSON.stringify({defaultCurrency:'USD',segments:segments.map(({sourceRef,text})=>({sourceRef,text})),visualSources:media.map(part=>part.sourceRef)});
-   const hash=aiCacheKey('extraction',model,{userId:uid,projectId:id,system:EXTRACTION_SYSTEM,content,schema:JSON.stringify(zodToJsonSchema(extractedCostsSchema,{$refStrategy:'none'})),maxTokens:8192,mask:false,...(media.length?{media:media.map(part=>({mimeType:part.mimeType,sourceRef:part.sourceRef,hash:aiCacheKey('media',part.mimeType,Buffer.from(part.data).toString('base64'))}))}:{})});
+   const hash=aiCacheKey('extraction',model,{userId:uid,projectId:id,system:EXTRACTION_SYSTEM,content,schema:JSON.stringify(z.toJSONSchema(extractedCostsSchema)),maxTokens:8192,mask:false,...(media.length?{media:media.map(part=>({mimeType:part.mimeType,sourceRef:part.sourceRef,hash:aiCacheKey('media',part.mimeType,Buffer.from(part.data).toString('base64'))}))}:{})});
    expect((await admin.from('ai_cache').upsert({hash,user_id:uid,project_id:id,kind:'extraction',result})).error).toBeNull();
   }
   const docx=readFileSync('tests/fixtures/codeaudit-budget.docx'),doc=htmlDocument((await mammoth.convertToHtml({buffer:docx})).value,'document','USD');

@@ -61,7 +61,7 @@ export function inspectZip(bytes: Buffer): 'xlsx' | 'ods' | 'docx' | 'pptx' {
       if (error) { failure = invalid(); return; }
       actualSize += data.length; actualTotal += data.length;
       if (actualTotal > MAX_EXPANDED_BYTES || actualSize > (entries.get(file.name) ?? 0)) { failure = new ImportError('This spreadsheet expands beyond its declared size or safety limit. Export a smaller copy.'); file.terminate(); return; }
-      if (file.name.endsWith('.xml')) {
+      if (/\.(?:xml|rels)$/i.test(file.name)) {
         const chunk = tail + Buffer.from(data).toString('utf8').replace(/\0/g, '');
         if (/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(chunk)) { failure = new ImportError('Spreadsheet XML containing DOCTYPE or entities is not supported.'); file.terminate(); return; }
         tail = chunk.slice(-40);

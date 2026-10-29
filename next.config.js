@@ -1,2 +1,0 @@
-/** @type {import('next').NextConfig} */
-module.exports = { outputFileTracingIncludes: {'/*':['./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs','./node_modules/pdfjs-dist/standard_fonts/**/*','./node_modules/pdfjs-dist/cmaps/**/*','./node_modules/libheif-js/**/*.wasm','./app/fonts/Inter-*.ttf','./node_modules/recharts/**','./node_modules/react-dom/**']}, serverExternalPackages: ['@react-pdf/renderer','exceljs','pdfjs-dist', '@napi-rs/canvas', 'sharp', 'mammoth', 'heic-decode', 'libheif-js', 'mailparser', '@kenjiuno/msgreader'] };

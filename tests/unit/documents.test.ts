@@ -56,3 +56,12 @@ it('rejects nested attachment traversal beyond one level',async()=>{
 it('extracts actual text and page thumbnails from a PDF without network or disk writes',async()=>{
  const parsed=await readPdf(readFileSync('tests/fixtures/codeaudit-invoice.pdf'),true);expect(parsed.pages[0].text).toContain('Security review');expect(parsed.pages[0].thumbnail).toMatch(/^data:image\/jpeg;base64,/);
 });
+
+it('rejects DTDs in PPTX relationship parts and mixed-case inner XML before parsing',async()=>{
+ const {zipSync,unzipSync,strToU8}=await import('fflate');
+ for(const name of ['ppt/_rels/presentation.xml.rels','ppt/slides/injected.XML']){
+  const zip=unzipSync(readFileSync('tests/fixtures/budget-slide.pptx'));
+  zip[name]=strToU8('<!DOCTYPE x [<!ENTITY ext SYSTEM "file:///etc/passwd">]><x>&ext;</x>');
+  await expect(getAdapter('pptx')!.parse(Buffer.from(zipSync(zip)),{fileName:'budget-slide.pptx',projectId})).rejects.toThrow(/DOCTYPE|entities/);
+ }
+});

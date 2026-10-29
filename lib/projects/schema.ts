@@ -2,7 +2,7 @@ import { z } from 'zod';
 export const currencies = ['USD', 'PKR', 'EUR', 'GBP', 'AED', 'CAD', 'AUD', 'JPY', 'INR', 'SAR', 'CNY', 'CHF', 'SGD'] as const;
 export const projectSchema = z.object({
   name: z.string().trim().min(1, 'Enter a project name.').max(120, 'Use at most 120 characters.'),
-  currency: z.enum(currencies, { errorMap: () => ({ message: 'Choose a supported currency.' }) }),
+  currency: z.enum(currencies, { error: 'Choose a supported currency.' }),
 });
 export const projectNameSchema = projectSchema.pick({ name: true });
 export const idSchema = z.string().uuid('Invalid identifier.');

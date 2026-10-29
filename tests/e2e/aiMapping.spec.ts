@@ -1,7 +1,7 @@
 import {test,expect} from './fixtures';
 import {createClient} from '@supabase/supabase-js';
 import {randomBytes,randomUUID} from 'node:crypto';
-import {zodToJsonSchema} from 'zod-to-json-schema';
+import {z} from 'zod';
 import {aiCacheKey} from '../../lib/ai/cacheKey';
 import {aiMappingSchema,mappingSample} from '../../lib/ai/schemas';
 import {MAPPING_SYSTEM,mappingContent} from '../../lib/ai/mappingPrompt';
@@ -16,7 +16,7 @@ test('one-click AI mapping of odd headers, reasons, confirmation, import and sav
     const project=await client.from('projects').insert({owner_id:uid,name:'AI mapped CodeAudit',currency:'USD'}).select('id').single();expect(project.error).toBeNull();const id=project.data!.id;
     const raw={columns:['Deliverable','Quoted','Invoiced'],rows:[{Deliverable:'Authentication',Quoted:'1200',Invoiced:'1350'},{Deliverable:'Import wizard',Quoted:'2000',Invoiced:'1850'},{Deliverable:'Dashboard',Quoted:'1500',Invoiced:'1500'}]};
     const model=process.env.GEMINI_MODEL_FAST||'gemini-flash-lite-latest';
-    const hash=aiCacheKey('mapping',model,{userId:uid,projectId:id,system:MAPPING_SYSTEM,content:mappingContent(mappingSample(raw.columns,raw.rows)),schema:JSON.stringify(zodToJsonSchema(aiMappingSchema,{$refStrategy:'none'})),maxTokens:2048,mask:true});
+    const hash=aiCacheKey('mapping',model,{userId:uid,projectId:id,system:MAPPING_SYSTEM,content:mappingContent(mappingSample(raw.columns,raw.rows)),schema:JSON.stringify(z.toJSONSchema(aiMappingSchema)),maxTokens:2048,mask:true});
     const result={item:{column:'Deliverable',confidence:.98,reason:'Describes the work delivered.'},estimated:{column:'Quoted',confidence:.96,reason:'Quoted prices represent planned costs.'},actual:{column:'Invoiced',confidence:.97,reason:'Invoiced amounts represent incurred costs.'}};
     // Private seeded cache exercises the actual route/gateway/quota/audit path without paid calls.
     expect((await admin.from('ai_cache').upsert({hash,user_id:uid,project_id:id,kind:'mapping',result})).error).toBeNull();

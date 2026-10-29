@@ -7,7 +7,7 @@ export const aiMappingSchema=z.object(Object.fromEntries(fields.map(field=>[fiel
 });
 export type AiMapping=z.infer<typeof aiMappingSchema>;
 const cell=z.union([z.string().max(1000),z.number().finite(),z.boolean(),z.null()]);
-export const mappingInputSchema=z.object({columns:z.array(z.string().min(1).max(256)).min(1).max(256).refine(columns=>new Set(columns).size===columns.length,'Columns must be unique.'),sampleRows:z.array(z.record(cell)).max(5)}).strict().superRefine((input,ctx)=>{
+export const mappingInputSchema=z.object({columns:z.array(z.string().min(1).max(256)).min(1).max(256).refine(columns=>new Set(columns).size===columns.length,'Columns must be unique.'),sampleRows:z.array(z.record(z.string(),cell)).max(5)}).strict().superRefine((input,ctx)=>{
   if(input.sampleRows.some(row=>Object.keys(row).some(column=>!input.columns.includes(column))))ctx.addIssue({code:'custom',message:'Sample cells must use the supplied columns.'});
 });
 export type MappingInput=z.infer<typeof mappingInputSchema>;

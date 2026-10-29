@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { costRowSchema, type CostRow, type RawTable } from './schema';
 export const fields = ['item', 'group', 'category', 'estimated', 'actual', 'currency', 'date', 'notes', 'sourceRef', 'confidence'] as const;
 export type CostField = typeof fields[number];
-export const mappingSchema = z.record(z.enum(fields), z.string().min(1).max(256)).superRefine((map, ctx) => {
+export const mappingSchema = z.partialRecord(z.enum(fields), z.string().min(1).max(256)).superRefine((map, ctx) => {
   const values = Object.values(map);
   if (new Set(values).size !== values.length) ctx.addIssue({ code: 'custom', message: 'Each column can map to only one field.' });
 });

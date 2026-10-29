@@ -1,7 +1,7 @@
 import{test,expect}from'./fixtures';
 import{createClient}from'@supabase/supabase-js';
 import{randomBytes,randomUUID}from'node:crypto';
-import{zodToJsonSchema}from'zod-to-json-schema';
+import {z} from 'zod';
 import{aiCacheKey}from'../../lib/ai/cacheKey';
 import{AI_TEST_CONTENT,AI_TEST_SYSTEM,aiTestSchema}from'../../lib/ai/testTask';
 
@@ -11,7 +11,7 @@ test('AI settings privacy persistence, private cache, usage, 21st-call HTTP 429/
   const options={auth:{persistSession:false,autoRefreshToken:false}},admin=createClient(url,process.env.SUPABASE_SERVICE_ROLE_KEY!,options),client=createClient(url,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,options);
   const email=`costlens-ai-settings-${randomUUID()}@example.com`,password=randomBytes(24).toString('base64url');const created=await admin.auth.admin.createUser({email,password,email_confirm:true});expect(created.error).toBeNull();const uid=created.data.user!.id;
   const model=process.env.GEMINI_MODEL_FAST||'gemini-flash-lite-latest';
-  const hash=aiCacheKey('test',model,{userId:uid,projectId:null,system:AI_TEST_SYSTEM,content:AI_TEST_CONTENT,schema:JSON.stringify(zodToJsonSchema(aiTestSchema,{$refStrategy:'none'})),maxTokens:128,mask:true});
+  const hash=aiCacheKey('test',model,{userId:uid,projectId:null,system:AI_TEST_SYSTEM,content:AI_TEST_CONTENT,schema:JSON.stringify(z.toJSONSchema(aiTestSchema)),maxTokens:128,mask:true});
   try{
     expect((await client.auth.signInWithPassword({email,password})).error).toBeNull();
     expect((await admin.from('ai_usage').insert({user_id:uid,task:'test',model,input_tokens:100,output_tokens:50,latency_ms:20})).error).toBeNull();

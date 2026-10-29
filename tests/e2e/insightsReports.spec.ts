@@ -2,7 +2,7 @@ import {test,expect} from './fixtures';
 import {createClient} from '@supabase/supabase-js';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {zodToJsonSchema} from 'zod-to-json-schema';
+import {z} from 'zod';
 import ExcelJS from 'exceljs';
 import Papa from 'papaparse';
 import {aiCacheKey,canonicalJson} from '../../lib/ai/cacheKey';
@@ -22,7 +22,7 @@ test('CodeAudit insights, anomaly-only filtering, off-page row focus and profess
   const rows:CostTableRow[]=inserted.data!.map(row=>({id:row.id,item:row.item,group:row.grp,category:row.category,estimated:row.estimated,actual:row.actual,currency:row.currency,date:row.date,notes:null,sourceRef:null,confidence:null,sourceId:null,sourceName:null,type:'manual'})),data=summaryData(rows,'USD');
   const fixture=JSON.parse(readFileSync('tests/fixtures/codeaudit-insights.json','utf8')),raw={...fixture,anomalies:data.payload.flaggedRows.map((row,index)=>({rowId:`row_${index+1}`,likelyCause:row.item==='AI API'?'Usage may exceed the original allowance.':'The source records may need reconciliation.',suggestedAction:row.item==='AI API'?'Check the API invoice and usage limits.':'Compare the original records before changing costs.'}))};
   insightSummarySchema.parse(raw);const payload={...data.payload,flaggedRows:data.payload.flaggedRows.map((row,index)=>({...row,rowId:`row_${index+1}`}))},model=process.env.GEMINI_MODEL_SMART||'gemini-flash-lite-latest';
-  const hash=aiCacheKey('summary',model,{userId:uid,projectId:id,system:redactPersonalData(SUMMARY_SYSTEM),content:redactPersonalData(canonicalJson(payload)),schema:JSON.stringify(zodToJsonSchema(insightSummarySchema,{$refStrategy:'none'})),maxTokens:8192,mask:true,cacheContext:data.dataHash});
+  const hash=aiCacheKey('summary',model,{userId:uid,projectId:id,system:redactPersonalData(SUMMARY_SYSTEM),content:redactPersonalData(canonicalJson(payload)),schema:JSON.stringify(z.toJSONSchema(insightSummarySchema)),maxTokens:8192,mask:true,cacheContext:data.dataHash});
   expect((await admin.from('ai_cache').upsert({hash,user_id:uid,project_id:id,kind:'summary',result:raw})).error).toBeNull();
   await page.goto('/login');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Log in',exact:true}).click();await expect(page).toHaveURL(/\/projects$/);await page.goto(`/projects/${id}`);
   const mobile=test.info().project.name==='mobile';if(mobile)await page.getByRole('tab',{name:'AI insights',exact:true}).click();const panel=page.getByRole('region',{name:'AI insights',exact:true});await expect(panel).toBeVisible();

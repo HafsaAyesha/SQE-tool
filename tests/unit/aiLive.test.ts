@@ -4,7 +4,7 @@ import{randomBytes,randomUUID}from'node:crypto';
 import {readFileSync} from 'node:fs';
 import {summariseProject} from '@/lib/ai/tasks/summarise';
 import {extractCosts} from '@/lib/ai/tasks/extractCosts';
-import{zodToJsonSchema}from'zod-to-json-schema';
+import {z} from 'zod';
 const state=vi.hoisted(()=>({client:undefined as unknown}));
 vi.mock('server-only',()=>({}));
 vi.mock('@/lib/supabase/server',()=>({createClient:async()=>state.client}));
@@ -18,7 +18,7 @@ describe.skipIf(!enabled)('real Gemini opt-in smoke check',()=>{
     const options={auth:{persistSession:false,autoRefreshToken:false}},admin=createClient(url,process.env.SUPABASE_SERVICE_ROLE_KEY!,options),client=createClient(url,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,options);
     const email=`costlens-live-ai-${randomUUID()}@example.com`,password=randomBytes(24).toString('base64url');const created=await admin.auth.admin.createUser({email,password,email_confirm:true});expect(created.error).toBeNull();const uid=created.data.user!.id;
     const content='CostLens live check '+randomUUID(),model=resolveModel('test','fast');
-    const hash=aiCacheKey('test',model,{userId:uid,projectId:null,system:AI_TEST_SYSTEM,content,schema:JSON.stringify(zodToJsonSchema(aiTestSchema,{$refStrategy:'none'})),maxTokens:128,mask:true});
+    const hash=aiCacheKey('test',model,{userId:uid,projectId:null,system:AI_TEST_SYSTEM,content,schema:JSON.stringify(z.toJSONSchema(aiTestSchema)),maxTokens:128,mask:true});
     try{
       expect((await client.auth.signInWithPassword({email,password})).error).toBeNull();state.client=client;
       const task={task:'test' as const,system:AI_TEST_SYSTEM,userContent:content,schema:aiTestSchema,maxTokens:128,model:'fast'};
