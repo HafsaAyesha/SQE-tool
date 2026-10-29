@@ -88,3 +88,13 @@ describe('single safe Gemini gateway',()=>{
   });
 
 });
+
+
+it('allows only saved public-demo summaries and never spends provider tokens for a demo miss',async()=>{
+ mocks.auth.mockResolvedValue({data:{user:{id:uid,app_metadata:{costlens_demo:true}}},error:null});
+ mocks.hit.mockResolvedValue({data:{count:2},createdAt:'2025-01-01T00:00:00Z'});
+ expect((await callClaude({...options,refresh:true})).cached).toBe(true);expect(mocks.sdk).not.toHaveBeenCalled();
+ expect(mocks.hit).toHaveBeenCalledWith(expect.any(String),expect.any(AbortSignal),expect.objectContaining({userId:uid,allowExpired:true}));
+ mocks.hit.mockResolvedValue(null);await expect(callClaude(options)).rejects.toMatchObject({status:409});expect(mocks.sdk).not.toHaveBeenCalled();
+ await expect(callClaude({...options,task:'extraction'})).rejects.toMatchObject({status:403});expect(mocks.sdk).not.toHaveBeenCalled();
+});

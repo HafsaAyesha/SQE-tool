@@ -1,3 +1,4 @@
+import {assertWritableProject} from '@/lib/demo/access';
 import { NextResponse } from 'next/server';
 import { enforceRateLimit, rateLimitResponse } from '@/lib/security/rateLimit';
 import { revalidatePath } from 'next/cache';
@@ -13,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const headers = { 'Cache-Control': 'private, no-store' };
   const fail = (error: string, status = 400) => NextResponse.json({ error }, { status, headers });
   try {
-    const { id } = await params; const project=await requireProject(id); await enforceRateLimit('import',project.owner_id);
+    const { id } = await params; const project=await requireProject(id);assertWritableProject(project); await enforceRateLimit('import',project.owner_id);
     if (!request.headers.get('content-type')?.startsWith('application/json')) return fail('Send confirmed rows as JSON.');
     if (Number(request.headers.get('content-length')) > LIMIT) return fail('The confirmed import is too large.', 413);
     if (!request.body) return fail('No confirmed rows were received.');

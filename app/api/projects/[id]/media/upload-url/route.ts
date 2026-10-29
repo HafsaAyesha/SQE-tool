@@ -1,3 +1,4 @@
+import {assertWritableProject} from '@/lib/demo/access';
 import {NextResponse} from 'next/server';
 import {requireProject} from '@/lib/supabase/requireProject';
 import {enforceRateLimit} from '@/lib/security/rateLimit';
@@ -8,7 +9,7 @@ import {readMediaJson,mediaError} from '@/lib/media/http';
 import {ImportError} from '@/lib/import/errors';
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
  try{
-  const {id}=await params,project=await requireProject(id);await enforceRateLimit('import',project.owner_id);requireWorkerConfig();
+  const {id}=await params,project=await requireProject(id);assertWritableProject(project);await enforceRateLimit('import',project.owner_id);requireWorkerConfig();
   const input=uploadMediaSchema.safeParse(JSON.parse(await readMediaJson(request)));if(!input.success)throw new ImportError(input.error.issues[0].message);
   const extension=input.data.name.toLowerCase().split('.').pop() as typeof MEDIA_EXTENSIONS[number],uploadId=newMediaId(),path=mediaPath(id,uploadId,extension),mime=mediaMime[extension],db=mediaStore();
   const created=await db.from('jobs').insert({id:uploadId,project_id:id,type:['mp4','mov','webm'].includes(extension)?'video':'audio',storage_path:path,file_name:input.data.name,mime_type:mime,expected_size:input.data.size});if(created.error)throw new ImportError('Could not reserve a private media upload. Check migration 0006.',503);

@@ -1,3 +1,4 @@
+import {assertWritableProject} from '@/lib/demo/access';
 import { NextResponse } from 'next/server';
 import { enforceRateLimit, rateLimitResponse } from '@/lib/security/rateLimit';
 import { z } from 'zod';
@@ -33,7 +34,7 @@ async function boundedBody(request: Request) {
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const project=await requireProject(id); await enforceRateLimit('import',project.owner_id);
+    const project=await requireProject(id);assertWritableProject(project); await enforceRateLimit('import',project.owner_id);
     const contentType = request.headers.get('content-type') ?? '';
     if (!contentType.toLowerCase().startsWith('multipart/form-data;')) throw new ImportError('Send a file using the upload or paste form.');
     let form: FormData;

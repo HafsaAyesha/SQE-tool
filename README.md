@@ -1,41 +1,108 @@
 # CostLens
 
-A source-agnostic cost analysis app. Step 1.1 provides the landing page, responsive workspace shell, theme system, UI components and shared helpers. Step 1.2 adds Supabase SSR authentication, protected workspace routes, an ownership schema and RLS. Step 1.3 adds project cards and CRUD, editable manual cost tables with search/filter/sort/pagination, and a populated project switcher. Hosted Supabase configuration and both SQL migrations are required to use the hosted app.
+CostLens turns cost data from spreadsheets, documents, web sources and recordings into one project dashboard. Users review imported rows, compare estimated and actual spending, investigate anomalies, obtain AI explanations and export PDF, Excel or CSV reports. CodeAudit is the synthetic university-project example; the marketing-event demo shows the same workflow for another domain.
 
-Requires Node.js 22+ and npm. Uses Next.js 15, strict TypeScript, App Router, Tailwind 4 and shadcn/ui new-york.
+**Live URL:** <!-- LIVE_URL -->Not deployed/verified yet. The production verifier fills this with the actual working URL after setup.<!-- /LIVE_URL -->
+
+**Current release branch:** `phase-2-ai-foundation`. Production deployment is prepared, not yet verified. Follow [the exact dashboard steps](docs/deployment.md); do not deploy the older `main` branch by accident.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    B[Browser] -->|HTTPS / sessions| V[Vercel: Next.js 15]
+    B -->|Signed direct recording upload| S[Supabase: Auth, Postgres/RLS, private Storage, Realtime]
+    V --> S
+    V --> R[Upstash Redis: request limits and daily quotas]
+    V -->|One guarded server-only AI gateway| G[Gemini API]
+    V -->|HMAC-signed jobs| W[Render: Node 20 + ffmpeg worker]
+    W -->|Job-specific signed download URL| S
+    W -->|Timestamped speech transcription| O[OpenAI Whisper]
+    W -->|HMAC transcript/frame callback| V
+```
+
+Gemini replaces Claude/Anthropic at the project owner's request. `callClaude` remains a compatibility alias to the same Gemini gateway, not a second provider. The worker does not hold a database service key or call Gemini directly. The app owns authorization, privacy, quota checks, validation, usage recording and AI caching.
+
+## Local setup
+
+Use Node.js **22.x**, npm and a Supabase project. Docker/ffmpeg are needed for the local database/media worker workflows, not for browsing the landing page.
 
 ```sh
 npm ci
+cp .env.example .env.local
 npm run dev
 ```
 
-Public pages and offline tests require no credentials. Copy `.env.example` to `.env.local` and configure the Supabase URL and anon key to use authentication; see [Supabase setup](docs/supabase.md) for migration and email settings. Fill values securely. Only the Supabase URL and anon key are public. Keep the service role key and API/worker credentials server-only. The database migration must be applied to your Supabase project. Storage and other external integrations are future steps.
+Edit `.env.local` securely; it is git-ignored. Configure the public Supabase URL/anon key and the necessary server credentials. Apply the migrations in `supabase/migrations` in order. [Supabase setup](docs/supabase.md) describes the local stack; [deployment](docs/deployment.md) covers migration tracking and production email confirmation. Never reset an existing database merely to apply a new migration.
+
+Run the separate worker using [worker/README.md](worker/README.md). It needs Node 20/ffmpeg locally or its Docker image, an app origin, the shared HMAC secret and a speech key. For Docker, build from the repository root with `docker build -f worker/Dockerfile .`. The Render blueprint is `render.yaml`.
+
+## Environment variables
+
+`.env.example` lists the whole project's settings; `worker/.env.example` lists the smaller worker environment.
+
+| Variable | Location and purpose |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | App/browser: production or local Supabase origin. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | App/browser: anon key; ownership depends on RLS, not key secrecy. |
+| `SUPABASE_SERVICE_ROLE_KEY` | App/seed/verifier only: trusted database operations; never browser or worker. |
+| `GEMINI_API_KEY` | App only: extraction, mapping and summaries through the shared gateway. |
+| `GEMINI_MODEL_SMART`, `GEMINI_MODEL_FAST` | Optional app overrides; default is `gemini-flash-lite-latest`. Choose a model available to your Google project. |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | App: REST credentials for production request limits. |
+| `SOURCE_ENCRYPTION_KEY` | App: base64 of 32 random bytes for saved online-source configurations; preserve the key to keep saved sources readable. |
+| `APP_URL` | App/worker/seed/verifier: canonical HTTPS CostLens origin, not the Supabase URL. |
+| `WORKER_URL` | App/seed/verifier: canonical Render worker HTTPS origin. |
+| `WORKER_SECRET` | App and worker: identical random server-only secret, at least 32 characters. |
+| `OPENAI_API_KEY` | Worker only: speech transcription. No Anthropic key is required. |
+| `TRUST_PROXY_HEADERS` | Optional app setting for a trusted proxy that overwrites forwarded IP headers; Vercel is detected automatically. |
+| `DEMO_ENABLED` | App: leave `false` until production seeding is complete; set `true` and redeploy to enable public demo login. |
+| `DEMO_EMAIL`, `DEMO_PASSWORD` | App/seed only: synthetic demo account; password is generated securely, at least 16 characters, never committed or sent to the browser. |
+| `PORT` | Worker only: supplied by Render; local default 3001. |
+
+All variables except the two `NEXT_PUBLIC_SUPABASE_*` entries are server-only. No secret values belong in Git, URLs or chat. Provider dashboards still require appropriate production budgets/quotas; a billing alert is not necessarily a hard spending cap.
+
+## Tests and checks
+
+For build prompts in Phases 3–4, follow the FAST TESTING RULES in `CLAUDE.md`: lint, typecheck and only new/changed Vitest files. Do not automatically run Playwright or the full suite.
 
 ```sh
 npm run lint
 npm run typecheck
+npx vitest run tests/unit/demo.test.ts tests/unit/mediaMigration.test.ts tests/unit/aiClient.test.ts
+```
+
+For explicit phase checks, the available commands are:
+
+```sh
 npm run test
+npm run test:security
 npm run build
-npx playwright install chromium
 npm run test:e2e
 ```
 
-Playwright starts the production server, so build first. Where Chromium is preinstalled, use `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e`. No browser download is needed in this cloud environment. Tests run Chromium at desktop and mobile widths; they do not claim Safari coverage. Screenshots are generated in ignored `test-results/`.
+The security runner starts a local dev server and uses local Supabase, disposable real Redis and fake accounts. It requires a real Gemini key for its malicious-note scenario. Playwright requires a browser and a production build; the local runner can supply isolated Supabase/Redis settings. See [testing instructions](docs/testing.md), [security report](docs/security.md) and [recorded security results](docs/security-test-results.md). No full suite or Playwright run is claimed for Step 4A.
 
-Routes under `app/(app)` inherit the sidebar and top bar. `lib/format.ts` exports money formatting by project currency and percentage formatting from a ratio (0.125 → 12.5%). `EmptyState` and `PageHeader` provide reusable page scaffolding. Global providers include system-aware themes, tooltips and Sonner.
+## Production and public demo
 
-`components.json` initializes shadcn/ui's new-york style and aliases. UI sources came from the official shadcn-ui GitHub `apps/v4/registry/new-york-v4/ui` registry because this environment blocks ui.shadcn.com. Inter is bundled from the official rsms/inter repository using `next/font/local`; its license is in `app/fonts/OFL.txt`, so production builds require no font network requests. To add future components with the CLI, allow ui.shadcn.com in environment network settings or use the official GitHub sources.
+Use [docs/deployment.md](docs/deployment.md) for ordered Supabase, Upstash, Vercel, Render, confirmation-email and billing dashboard instructions. The app must use migration **0008** before enabling public demo sign-in. `npm run prepare:production` regenerates the reviewed migration bundle; it does not apply it to any database.
 
+Once the production services, keys and ignored seed environment are ready:
 
-The reusable `components/costlens/CostTable.tsx` accepts shared `CostTableRow` data and optional save/delete server actions. Omitting the mutation actions makes it read-only for future previews and reports. Project cards use the RLS-aware SQL summary view; item rows with source_id=null expose type manual. Variance columns are reserved for Step 1.7.
+```sh
+npm run seed:demo -- --dry-run
+npm run seed:demo
+```
 
+The first command only lists the plan. The second creates **CodeAudit – Final Year Project** from CSV, MS Project XML, a PDF invoice and the actual meeting-recording pipeline, with planted outliers and real generated insights. It creates **Sample – Marketing event** from a generated Word budget and receipt image. It checks extracted amounts against synthetic source data, commits reviewed rows, verifies recording cleanup and locks the account read-only. It never substitutes canned AI/Whisper output. A failed or incomplete seed cannot be opened through the demo button.
 
-Steps 1.4–1.5 add the registry-based import wizard at `/projects/[id]/import`: structured files, paste, and guarded online sources. See [imports setup and security](docs/imports.md). Apply migration 0003 for optional encrypted saved sources and configure SOURCE_ENCRYPTION_KEY securely to enable saving. Step 1.6 adds shared column mapping, saved templates, validated preview/fixes and transactional append/replace. Apply migration 0004 for commits. File imports are verified; live JSON API and HTML-table checks pass, while Google Sheets remains blocked by this cloud proxy's pinned-IP policy. Normal tests no longer take screenshots unless COSTLENS_CAPTURE_SCREENSHOTS=1 is explicitly set.
+After a successful seed, set Vercel's `DEMO_ENABLED=true`, redeploy, and run:
 
-Step 1.7 adds [shared decimal-safe cost calculations](docs/calculations.md) and signed variance/percentage/status columns in CostTable. Dashboard, anomaly and report features should import `lib/costs/calc.ts` rather than calculate variance separately. No additional environment variables or database migrations are needed.
+```sh
+npm run verify:production
+```
 
-Step 1.8 turns project pages into [shareable dashboards](docs/dashboard.md), with five KPIs, four responsive Recharts views, URL filters and keyboard-accessible chart drill-down. The same chart components accept data directly for future reports; an optional insights slot supports the later AI panel. No additional configuration is required.
+This checks live services, email-confirmation configuration, RLS, private Storage and the complete demo login → CodeAudit flow. Only on success does it write production verification evidence and update the live URL above. SMTP delivery, billing settings and actual dashboard changes still need the operator checks in the guide.
 
-Step 2.1 on `phase-2-ai-foundation` adds the [safe AI gateway](docs/ai.md), user/project-private cache, token/latency audit, distributed request/daily quotas and AI privacy/usage settings. Apply migration 0005 and configure Supabase service-role, Gemini and Upstash REST credentials before deploying this branch: login/import also enforce Upstash limits. Live-provider verification remains pending while those cloud credentials are absent.
+Visitors click **Try the demo** without entering credentials. They can switch projects, filter charts/tables, inspect anomalies, choose **Show saved insights**, and export reports. Public-demo writes, uploads, account credential changes and new paid AI tasks are blocked. Existing source fixtures and generated marketing assets are synthetic. The demo uses a shared account, so read/export quotas are shared; it is not a private sandbox for each visitor.
 
-Phase 2 document/media imports, insights and report work is on `phase-2-ai-foundation`. See [media setup](docs/media.md), [insight semantics](docs/insights.md), [report exports](docs/reports.md) and [worker deployment](worker/README.md). Apply migrations 0006–0007 for jobs/private Storage and summary invalidation. The worker requires an OpenAI speech key; Gemini remains the single cost-extraction/summarization provider. Raw recordings stay private for review and are deleted after commit.
+[Report implementation](docs/reports.md), [AI safeguards](docs/ai.md), [media processing](docs/media.md), [insights](docs/insights.md) and [local Step 4A status](docs/validation-4A.md) provide further details. Live media transcription/deployment remains unverified until the production seed and verifier succeed.

@@ -1,3 +1,4 @@
+import {assertWritableProject} from '@/lib/demo/access';
 import {NextResponse} from 'next/server';
 import {withGuard,jobIdSchema} from '@/lib/security/guard';
 import {createClient} from '@/lib/supabase/server';
@@ -13,6 +14,6 @@ export async function GET(_request:Request,{params}:Context){
  }catch(error){return mediaError(error);}
 }
 export async function DELETE(_request:Request,{params}:Context){
- try{const {id,jobId}=await params;await withGuard(id);jobIdSchema.parse(jobId);const db=mediaStore(),found=await db.from('jobs').select('*').eq('id',jobId).eq('project_id',id).single();if(found.error)throw new ImportError('Recording not found.',404);if(found.data.status==='processing')throw new ImportError('Wait for processing to finish before deleting this recording.',409);await deleteMediaUpload(found.data);if(found.data.status!=='done')await db.from('jobs').update({status:'failed',error:'Recording discarded.',result:null}).eq('id',jobId).eq('project_id',id);return NextResponse.json({deleted:true},{headers:{'Cache-Control':'private, no-store'}});
+ try{const {id,jobId}=await params;const project=await withGuard(id);assertWritableProject(project);jobIdSchema.parse(jobId);const db=mediaStore(),found=await db.from('jobs').select('*').eq('id',jobId).eq('project_id',id).single();if(found.error)throw new ImportError('Recording not found.',404);if(found.data.status==='processing')throw new ImportError('Wait for processing to finish before deleting this recording.',409);await deleteMediaUpload(found.data);if(found.data.status!=='done')await db.from('jobs').update({status:'failed',error:'Recording discarded.',result:null}).eq('id',jobId).eq('project_id',id);return NextResponse.json({deleted:true},{headers:{'Cache-Control':'private, no-store'}});
  }catch(error){return mediaError(error);}
 }

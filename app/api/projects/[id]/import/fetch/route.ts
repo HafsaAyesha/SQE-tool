@@ -1,3 +1,4 @@
+import {assertWritableProject} from '@/lib/demo/access';
 import { NextResponse } from 'next/server';
 import { enforceRateLimit, rateLimitResponse } from '@/lib/security/rateLimit';
 import { requireProject } from '@/lib/supabase/requireProject';
@@ -24,7 +25,7 @@ async function body(request: Request) {
 }
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params; const project=await requireProject(id); await enforceRateLimit('import',project.owner_id);
+    const { id } = await params; const project=await requireProject(id);assertWritableProject(project); await enforceRateLimit('import',project.owner_id);
     const parsed = onlineRequestSchema.safeParse(await body(request));
     if (!parsed.success) throw new ImportError(parsed.error.issues[0].message);
     const input = parsed.data;

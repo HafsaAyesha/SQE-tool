@@ -1,9 +1,11 @@
 import 'server-only';
 import { aiStore } from './store';
 export { aiCacheKey, canonicalJson } from './cacheKey';
-export type CacheScope={userId:string;projectId:string|null};
+export type CacheScope={userId:string;projectId:string|null;allowExpired?:boolean};
 export async function getAiCache(hash:string,signal:AbortSignal,scope:CacheScope){
-  let query=aiStore().from('ai_cache').select('result,created_at').eq('hash',hash).eq('user_id',scope.userId).gte('created_at',new Date(Date.now()-7*86400000).toISOString());
+  let query=aiStore().from('ai_cache').select('result,created_at').eq('hash',hash).eq('user_id',scope.userId);
+  // Only the server-derived public-demo actor may reuse its fixed synthetic summary.
+  if(!scope.allowExpired)query=query.gte('created_at',new Date(Date.now()-7*86400000).toISOString());
   query=scope.projectId?query.eq('project_id',scope.projectId):query.is('project_id',null);
   const {data,error}=await query.abortSignal(signal).maybeSingle();
   if(error){console.error('AI cache read failed',{code:error.code});return null;}

@@ -1,4 +1,5 @@
 'use server';
+import {assertWritableProject,assertWritableUser} from '@/lib/demo/access';
 import {withAction} from '@/lib/security/guard';
 import {enforceRateLimit} from '@/lib/security/rateLimit';
 import { revalidatePath } from 'next/cache';
@@ -24,6 +25,7 @@ export async function createProject(input: unknown): Promise<MutationResult> {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return { error: 'Please sign in to create a project.' };
+  assertWritableUser(user);
   await enforceRateLimit('mutation',user.id);
   const { data, error } = await supabase.from('projects').insert({ ...parsed.data, owner_id: user.id }).select('id').single();
   if (error || !data) return failure('create project', error?.code);
@@ -33,7 +35,7 @@ export async function createProject(input: unknown): Promise<MutationResult> {
 }
 export async function renameProject(projectId: string, input: unknown): Promise<MutationResult> {
   return withAction(async()=>{
-  const project = await requireProject(projectId);
+  const project = await requireProject(projectId);assertWritableProject(project);
   await enforceRateLimit('mutation',project.owner_id);
   const parsed = projectNameSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -46,7 +48,7 @@ export async function renameProject(projectId: string, input: unknown): Promise<
 }
 export async function deleteProject(projectId: string): Promise<MutationResult> {
   return withAction(async()=>{
-  const project = await requireProject(projectId);
+  const project = await requireProject(projectId);assertWritableProject(project);
   await enforceRateLimit('mutation',project.owner_id);
   try{await cleanupProjectMedia(projectId);}catch{return {error:'Private recordings could not be deleted. Please retry before deleting the project.'};}
   const supabase = await createClient();
@@ -58,7 +60,7 @@ export async function deleteProject(projectId: string): Promise<MutationResult> 
 }
 export async function saveCostItem(projectId: string, rowId: string | null, input: unknown): Promise<MutationResult> {
   return withAction(async()=>{
-  const project = await requireProject(projectId);
+  const project = await requireProject(projectId);assertWritableProject(project);
   await enforceRateLimit('mutation',project.owner_id);
   const parsed = costInputSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -77,7 +79,7 @@ export async function saveCostItem(projectId: string, rowId: string | null, inpu
 }
 export async function deleteCostItem(projectId: string, rowId: string): Promise<MutationResult> {
   return withAction(async()=>{
-  const project=await requireProject(projectId);await enforceRateLimit('mutation',project.owner_id);
+  const project=await requireProject(projectId);assertWritableProject(project);await enforceRateLimit('mutation',project.owner_id);
   if (!idSchema.safeParse(rowId).success) return { error: 'Invalid row identifier.' };
   const supabase = await createClient();
   const { data, error } = await supabase.from('cost_items').delete().eq('id', rowId).eq('project_id', projectId).select('id').maybeSingle();

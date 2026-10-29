@@ -1,4 +1,5 @@
 import 'server-only';
+import {DemoReadOnlyError} from '@/lib/demo/access';
 import {z} from 'zod';
 import {requireProject} from '@/lib/supabase/requireProject';
 import {enforceRateLimit,RateLimitError,RateLimitUnavailableError,type LimitKind} from './rateLimit';
@@ -9,7 +10,7 @@ export async function withGuard(projectId:string,kind:LimitKind='read'){
 export const jobIdSchema=z.string().uuid();
 export async function withAction<T>(work:()=>Promise<T>):Promise<T|{error:string}>{
  try{return await work();}catch(error){
-  if(error instanceof RateLimitError||error instanceof RateLimitUnavailableError)return {error:error.message};
+  if(error instanceof DemoReadOnlyError||error instanceof RateLimitError||error instanceof RateLimitUnavailableError)return {error:error.message};
   if(typeof error==='object'&&error&&'digest'in error)throw error;
   console.error('Server action failed',{type:error instanceof Error?error.name:'unknown'});
   return {error:'We could not save this change. Please try again.'};

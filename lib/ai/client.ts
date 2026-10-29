@@ -1,4 +1,5 @@
 import 'server-only';
+import {isDemoUser,DEMO_MESSAGE} from '@/lib/demo/access';
 import { ProxyAgent } from 'undici';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
@@ -40,6 +41,8 @@ async function runAI<T>(options:Options<T>,workerActor?:{userId:string;projectId
   async function work():Promise<AiResult<T>>{
     const auth=workerActor?{data:{user:{id:workerActor.userId}},error:null}:await (await createClient()).auth.getUser();const {data:{user},error}=auth;check();
     if(error||!user)throw new AiError('Please sign in before using AI.',401);
+    const demoActor=isDemoUser(user);
+    if(demoActor&&data.task!=='summary')throw new AiError(DEMO_MESSAGE,403);
     userId=user.id;
     if(workerActor){if(data.projectId!==workerActor.projectId)throw new AiError('The recording project is invalid.',403);}else if(data.projectId)await requireProject(data.projectId);check();
     model=resolveModel(data.task,data.model);aiStore();
@@ -50,8 +53,9 @@ async function runAI<T>(options:Options<T>,workerActor?:{userId:string;projectId
     const content=protect(data.userContent),system=protect(data.system);
     const schemaText=protect(JSON.stringify(z.toJSONSchema(options.schema)));
     const hash=aiCacheKey(data.task,model,{userId:user.id,projectId:data.projectId??null,system,content,schema:schemaText,maxTokens:data.maxTokens,mask,...(data.cacheContext?{cacheContext:data.cacheContext}:{}),...(data.media?.length?{media:data.media.map(part=>({mimeType:part.mimeType,sourceRef:part.sourceRef,hash:aiCacheKey('media',part.mimeType,Buffer.from(part.data).toString('base64'))}))}:{})});
-    const hit=data.refresh?null:await getAiCache(hash,controller.signal,{userId:user.id,projectId:data.projectId??null});check();
+    const hit=data.refresh&&!demoActor?null:await getAiCache(hash,controller.signal,{userId:user.id,projectId:data.projectId??null,...(demoActor?{allowExpired:true}:{})});check();
     if(hit!==null){const valid=await options.schema.safeParseAsync(hit.data);check();if(valid.success){cached=true;success=true;return {data:valid.data,cached:true,model,inputTokens:0,outputTokens:0,generatedAt:hit.createdAt};}}
+    if(demoActor)throw new AiError('The saved demo insights are unavailable. Create your own account to generate insights.',409);
     if(data.cacheOnly)throw new AiError('Generate AI insights in the report preview before downloading the AI section.',409);
     const apiKey=process.env.GEMINI_API_KEY;if(!apiKey)throw new AiError('AI is not configured yet. Please try again later.');
     const proxyUrl=process.env.HTTPS_PROXY||process.env.https_proxy||process.env.HTTP_PROXY||process.env.http_proxy;

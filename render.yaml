@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: costlens-worker
+    runtime: docker
+    branch: phase-2-ai-foundation
+    plan: starter
+    dockerContext: .
+    dockerfilePath: ./worker/Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: APP_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: WORKER_SECRET
+        generateValue: true
