@@ -1,0 +1,9 @@
+import {z} from 'zod';
+import {MEDIA_BYTES,MEDIA_EXTENSIONS,MEDIA_SECONDS} from '@/shared/media';
+export const mediaMime:Record<typeof MEDIA_EXTENSIONS[number],string>={mp3:'audio/mpeg',wav:'audio/wav',m4a:'audio/mp4',ogg:'audio/ogg',mp4:'video/mp4',mov:'video/quicktime',webm:'video/webm'};
+export const uploadMediaSchema=z.object({name:z.string().trim().min(1).max(200),size:z.number().int().positive().max(MEDIA_BYTES),duration:z.number().finite().positive().max(MEDIA_SECONDS).optional()}).strict().superRefine((value,ctx)=>{if(!MEDIA_EXTENSIONS.includes(value.name.toLowerCase().split('.').pop() as typeof MEDIA_EXTENSIONS[number]))ctx.addIssue({code:'custom',path:['name'],message:'Choose MP3, WAV, M4A, OGG, MP4, MOV or WEBM.'});});
+export const createMediaJobSchema=z.object({uploadId:z.string().uuid(),consentTranscription:z.literal(true)}).strict();
+export const mediaStatusSchema=z.enum(['queued','processing','needs_review','failed','done']);
+export const mediaJobSchema=z.object({id:z.string().uuid(),project_id:z.string().uuid(),source_id:z.string().uuid().nullable(),type:z.enum(['audio','video']),status:mediaStatusSchema,progress:z.number().int().min(0).max(100),error:z.string().nullable(),result:z.unknown().nullable(),file_name:z.string(),file_hash:z.string().nullable(),duration:z.number().nullable(),cleanup_pending:z.boolean()});
+export type MediaJob=z.infer<typeof mediaJobSchema>;
+export const mediaExtractionSchema=z.object({jobId:z.string().uuid(),timestamp:z.number().int(),transcript:z.array(z.object({start:z.number().finite().min(0).max(MEDIA_SECONDS),end:z.number().finite().min(0).max(MEDIA_SECONDS),text:z.string().max(10000)}).strict()).max(5000),frames:z.array(z.object({seconds:z.number().finite().min(0).max(MEDIA_SECONDS),data:z.string().max(50000).regex(/^[A-Za-z0-9+/]+={0,2}$/)}).strict()).max(60)}).strict();

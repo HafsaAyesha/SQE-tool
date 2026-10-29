@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProject } from '@/lib/supabase/requireProject';
 import { idSchema, projectNameSchema, projectSchema } from '@/lib/projects/schema';
+import { cleanupProjectMedia } from '@/lib/media/server';
 import { costInputSchema } from '@/lib/costs/schema';
 export type MutationResult = { error?: string; id?: string; success?: boolean };
 function refresh(projectId?: string) {
@@ -37,6 +38,7 @@ export async function renameProject(projectId: string, input: unknown): Promise<
 }
 export async function deleteProject(projectId: string): Promise<MutationResult> {
   const project = await requireProject(projectId);
+  try{await cleanupProjectMedia(projectId);}catch{return {error:'Private recordings could not be deleted. Please retry before deleting the project.'};}
   const supabase = await createClient();
   const { data, error } = await supabase.from('projects').delete().eq('id', projectId).eq('owner_id', project.owner_id).select('id').maybeSingle();
   if (error || !data) return failure('delete project', error?.code);

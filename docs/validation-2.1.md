@@ -1,4 +1,4 @@
-# Step 2.1 validation — 2026-10-27
+# Step 2.1 validation — 2026-10-28
 
 Phase 1 was committed and pushed to GitHub main at 1bf5bdb. Step 2.1 is isolated on phase-2-ai-foundation.
 
@@ -18,7 +18,7 @@ Phase 1 was committed and pushed to GitHub main at 1bf5bdb. Step 2.1 is isolated
 | Build/lint/typecheck | Production build and npm scripts | PASS | npm run build; npm run lint; npm run typecheck |
 | Unit/database regression suite | Real local Supabase and disposable Redis runner | PASS | 228 passed; 4 explicit live-network tests skipped |
 | Browser regression suite | Production app, real local Supabase/Redis, 1440px/390px | PASS | 24 passed; 2 unrelated opt-in external import checks skipped |
-| Real Anthropic + hosted Upstash connection | Runtime/Next env availability check | FAIL | ANTHROPIC_API_KEY, Upstash URL/token and hosted service-role key are absent; no live provider success claimed |
+| Real Anthropic + hosted Upstash connection | Runtime/Next env availability check | FAIL | ANTHROPIC_API_KEY and Upstash URL/token are absent; GEMINI_API_KEY is present but cannot authenticate the requested Anthropic SDK; no live provider success claimed |
 
 Commands:
 
@@ -44,3 +44,9 @@ Changes: lib/ai client/cache/cacheKey/errors/preferences/redact/store/testTask/u
 Deployment requires Anthropic, Upstash REST, Supabase service-role and existing public Supabase settings. Optional model overrides and TRUST_PROXY_HEADERS are documented in .env.example. This branch intentionally fails closed for login/import when Redis is unavailable; configure it before deployment/merge. Main remains the Phase 1 app.
 
 Step 2.1: NOT READY for live use — implementation and local validation complete; real-provider/hosted-service credentials, hosted migration and live checks remain.
+
+## Recheck on 2026-10-28
+
+The existing implementation was reviewed against the repeated Step 2.1 request; no application changes were needed. Lint and typecheck passed. Plain `npm run test` initially failed in hosted RLS fixture setup (`Create test user A failed (0)`); it is not reported as a passing hosted check. Using the documented isolated local runner, all 228 tests passed with four explicitly skipped live-network tests. The production build passed. The configured Gemini credential does not replace the Anthropic credential required by this implementation. Hosted Upstash credentials are still absent.
+
+The production browser rerun completed: **24 passed, 2 skipped** (external-source checks). This includes Settings privacy persistence, usage/cache checks and real HTTP 429 responses on desktop and mobile. No screenshots were generated. Step 2.1 remains NOT READY for live use pending Anthropic and hosted Upstash configuration, hosted migration and live-provider validation.

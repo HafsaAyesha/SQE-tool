@@ -1,4 +1,6 @@
+import { cleanupProjectMedia } from '@/lib/media/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('@/lib/media/server',()=>({cleanupProjectMedia:vi.fn(async()=>{})}));
 const mocks = vi.hoisted(() => ({ from: vi.fn(), getUser: vi.fn(), requireProject: vi.fn(), insert: vi.fn(), update: vi.fn(), delete: vi.fn(), eq: vi.fn(), select: vi.fn(), single: vi.fn(), maybeSingle: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ from: mocks.from, auth: { getUser: mocks.getUser } }) }));
@@ -70,4 +72,9 @@ describe('project mutation boundaries', () => {
     await expect(saveCostItem(projectId, null, valid)).rejects.toThrow('404');
     expect(mocks.from).not.toHaveBeenCalled();
   });
+});
+
+it('preserves a project if private media cleanup fails',async()=>{
+  vi.mocked(cleanupProjectMedia).mockRejectedValueOnce(new Error('Storage unavailable'));
+  const result=await deleteProject('11111111-1111-4111-8111-111111111111');expect(result.error).toContain('Private recordings');expect(mocks.delete).not.toHaveBeenCalled();
 });

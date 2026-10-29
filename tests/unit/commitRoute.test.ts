@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+vi.mock('server-only',()=>({}));
 const mocks = vi.hoisted(() => ({ requireProject:vi.fn(), rpc:vi.fn(), revalidatePath:vi.fn() }));
 vi.mock('@/lib/security/rateLimit',()=>({enforceRateLimit:vi.fn(),rateLimitResponse:()=>null,loginIdentifier:()=> 'test-ip',RateLimitError:class extends Error{},RateLimitUnavailableError:class extends Error{}}));
 vi.mock('next/headers',()=>({headers:async()=>new Headers()}));

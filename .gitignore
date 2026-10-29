@@ -11,3 +11,7 @@ test-results/
 # Supabase CLI local state (contains generated local credentials)
 supabase/.temp/
 supabase/.branches/
+
+# Media worker build/install output
+worker/node_modules/
+worker/dist/

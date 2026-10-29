@@ -10,6 +10,12 @@ import { gsheetsAdapter } from './adapters/gsheets';
 import { urlAdapter } from './adapters/url';
 import { htmlAdapter } from './adapters/html';
 import { pasteAdapter } from './adapters/paste';
+import { mediaAdapter } from './adapters/media';
+import { docxAdapter } from './adapters/docx';
+import { pdfAdapter } from './adapters/pdf';
+import { imageAdapter } from './adapters/image';
+import { pptxAdapter } from './adapters/pptx';
+import { emailAdapter } from './adapters/email';
 const adapters = new Map<string, ImportAdapter>();
 export function registerAdapter(adapter: ImportAdapter) {
   if (!/^[a-z][a-z0-9-]{0,79}$/.test(adapter.id) || adapters.has(adapter.id)) throw new Error('Importer IDs must be valid and unique.');
@@ -26,4 +32,4 @@ export async function getAdapterFor(input: File | Buffer | string, options?: Par
   const compatible = all.filter(adapter => file.format !== 'text' || adapter.accepts.extensions.some(ext => ['.csv', '.tsv', '.txt', '.json', '.xml'].includes(ext)));
   return compatible.find(adapter => file.mimeType && adapter.accepts.mimeTypes.includes(file.mimeType)) ?? compatible.find(adapter => adapter.accepts.extensions.includes(`.${extension(file.fileName)}`)) ?? null;
 }
-for (const adapter of [csvAdapter, excelAdapter, jsonAdapter, xmlAdapter, msprojectAdapter, pasteAdapter, gsheetsAdapter, urlAdapter, htmlAdapter]) registerAdapter(adapter);
+for (const adapter of [csvAdapter, excelAdapter, jsonAdapter, xmlAdapter, msprojectAdapter, pasteAdapter, gsheetsAdapter, urlAdapter, htmlAdapter, docxAdapter, pdfAdapter, imageAdapter, pptxAdapter, emailAdapter, mediaAdapter]) registerAdapter(adapter);

@@ -5,8 +5,12 @@ import { requireProject } from '@/lib/supabase/requireProject';
 import { getAdapter, getAdapterFor } from '@/lib/import/registry';
 import { ImportError } from '@/lib/import/errors';
 import { parseOptionsSchema, parseResponseSchema } from '@/lib/import/schema';
+import { documentPlan } from '@/lib/import/documentPlan';
+import { fileHash } from '@/lib/import/document';
+import { AiError } from '@/lib/ai/errors';
 import { MAX_DOCUMENT_BYTES, PREVIEW_ROWS } from '@/lib/import/limits';
 export const runtime = 'nodejs';
+export const maxDuration=300;
 const bodyLimit = MAX_DOCUMENT_BYTES + 64 * 1024;
 async function boundedBody(request: Request) {
   const length = request.headers.get('content-length');
@@ -42,14 +46,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!options.success || !adapterId.success) throw new ImportError('The selected source options are invalid.');
     // Detection inspects signatures and ZIP expansion; every adapter's parse is independently guarded.
     const adapter = adapterId.data ? getAdapter(adapterId.data) : await getAdapterFor(file);
-    if (!adapter) throw new ImportError('This format is not supported yet. Choose CSV, TSV, text, Excel, ODS, JSON or XML.');
-    const table = await adapter.parse(file, options.data);
+    if (!adapter) throw new ImportError('This format is not supported yet. Choose a supported structured file, Word, PDF, image, slides or email.');
+    if(adapter.kind==='ai'&&form.get('extractAi')!=='true'){
+      const estimate=await documentPlan(file);
+      return NextResponse.json({requiresConfirmation:true,estimate,fileHash:fileHash(Buffer.from(await file.arrayBuffer()))},{status:202,headers:{'Cache-Control':'private, no-store'}});
+    }
+    const table = await adapter.parse(file, {...options.data,projectId:id,currency:project.currency,confirmAi:form.get('confirmAi')==='true'});
     const result = parseResponseSchema.parse({ ...table, rows: form.get('full') === 'true' ? table.rows : table.rows.slice(0, PREVIEW_ROWS), totalCount: table.rows.length, previewLimit: PREVIEW_ROWS });
     return NextResponse.json(result, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     const limited=rateLimitResponse(error);if(limited)return limited;
     const digest = typeof error === 'object' && error !== null && 'digest' in error ? error.digest : undefined;
     if (digest === 'NEXT_HTTP_ERROR_FALLBACK;404') return NextResponse.json({ error: 'Project not found.' }, { status: 404, headers: { 'Cache-Control': 'private, no-store' } });
+    if (error instanceof AiError) return NextResponse.json({error:error.message},{status:error.status,headers:{'Cache-Control':'private, no-store',...(error.retryAfter?{'Retry-After':String(error.retryAfter)}:{})}});
     if (error instanceof ImportError) return NextResponse.json({ error: error.message }, { status: error.status, headers: { 'Cache-Control': 'private, no-store' } });
     console.error('Import request failed', { errorType: error instanceof Error ? error.name : 'unknown' });
     return NextResponse.json({ error: 'We could not import this file. Please try again.' }, { status: 500, headers: { 'Cache-Control': 'private, no-store' } });

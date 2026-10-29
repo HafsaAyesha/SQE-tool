@@ -10,7 +10,7 @@ test('AI settings privacy persistence, private cache, usage, 21st-call HTTP 429/
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL!;expect(['localhost','127.0.0.1']).toContain(new URL(url).hostname);
   const options={auth:{persistSession:false,autoRefreshToken:false}},admin=createClient(url,process.env.SUPABASE_SERVICE_ROLE_KEY!,options),client=createClient(url,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,options);
   const email=`costlens-ai-settings-${randomUUID()}@example.com`,password=randomBytes(24).toString('base64url');const created=await admin.auth.admin.createUser({email,password,email_confirm:true});expect(created.error).toBeNull();const uid=created.data.user!.id;
-  const model=process.env.ANTHROPIC_MODEL_FAST||'claude-haiku-5-5';
+  const model=process.env.GEMINI_MODEL_FAST||'gemini-flash-lite-latest';
   const hash=aiCacheKey('test',model,{userId:uid,projectId:null,system:AI_TEST_SYSTEM,content:AI_TEST_CONTENT,schema:JSON.stringify(zodToJsonSchema(aiTestSchema,{$refStrategy:'none'})),maxTokens:128,mask:true});
   try{
     expect((await client.auth.signInWithPassword({email,password})).error).toBeNull();

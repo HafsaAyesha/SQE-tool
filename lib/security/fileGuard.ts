@@ -4,9 +4,9 @@ import { parseOptionsSchema, rawTableSchema, type ParseOptions, type RawTable } 
 import type { ImportAdapter } from '@/lib/import/adapters/types';
 import { MAX_DOCUMENT_BYTES, MAX_ROWS, MAX_EXPANDED_BYTES, MAX_COLUMNS } from '@/lib/import/limits';
 export { MAX_DOCUMENT_BYTES, MAX_ROWS, MAX_EXPANDED_BYTES, MAX_COLUMNS } from '@/lib/import/limits';
-export type FileFormat = 'xlsx' | 'xls' | 'ods' | 'json' | 'xml' | 'msproject' | 'text' | 'pdf' | 'png' | 'jpeg';
+export type FileFormat = 'xlsx' | 'xls' | 'ods' | 'json' | 'xml' | 'msproject' | 'text' | 'pdf' | 'png' | 'jpeg' | 'webp' | 'heic' | 'docx' | 'pptx' | 'eml' | 'msg';
 export type InspectedFile = { bytes: Buffer; fileName: string; mimeType: string; format: FileFormat; text?: string };
-const formats: Record<string, FileFormat> = { xlsx: 'xlsx', xls: 'xls', ods: 'ods', json: 'json', xml: 'xml', csv: 'text', tsv: 'text', txt: 'text', pdf: 'pdf', png: 'png', jpg: 'jpeg', jpeg: 'jpeg' };
+const formats: Record<string, FileFormat> = { xlsx: 'xlsx', xls: 'xls', ods: 'ods', json: 'json', xml: 'xml', csv: 'text', tsv: 'text', txt: 'text', pdf: 'pdf', png: 'png', jpg: 'jpeg', jpeg: 'jpeg', webp: 'webp', heic: 'heic', docx: 'docx', pptx: 'pptx', eml: 'eml', msg: 'msg' };
 export function extension(name: string) { return name.toLowerCase().split('.').pop() ?? ''; }
 export function decodeText(bytes: Buffer) {
   try {
@@ -20,7 +20,7 @@ export function rejectDTD(text: string) {
   if (/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(text)) throw new ImportError('XML files containing DOCTYPE or entity declarations are not supported. Export the file without a DTD.');
 }
 /** Inspect directory sizes BEFORE inflation; then stream and verify actual expanded sizes. */
-function inspectZip(bytes: Buffer): 'xlsx' | 'ods' {
+export function inspectZip(bytes: Buffer): 'xlsx' | 'ods' | 'docx' | 'pptx' {
   const invalid = () => new ImportError('This spreadsheet archive is damaged or unsupported. Export it again and retry.');
   let end = -1;
   for (let pos = bytes.length - 22; pos >= Math.max(0, bytes.length - 65557); pos--) {
@@ -48,7 +48,10 @@ function inspectZip(bytes: Buffer): 'xlsx' | 'ods' {
   if (pos !== end) throw invalid();
   const isXlsx = entries.has('[Content_Types].xml') && entries.has('xl/workbook.xml');
   const isOds = entries.has('mimetype') && entries.has('content.xml') && entries.has('META-INF/manifest.xml');
-  if (!isXlsx && !isOds) throw new ImportError('This ZIP file is not an Excel or OpenDocument spreadsheet.');
+  const isDocx=entries.has('[Content_Types].xml')&&entries.has('word/document.xml');
+  const isPptx=entries.has('[Content_Types].xml')&&entries.has('ppt/presentation.xml');
+  if ([...entries.keys()].some(name=>/vbaProject\.bin$/i.test(name))) throw new ImportError('Macro-enabled documents are not supported.');
+  if (!isXlsx && !isOds && !isDocx && !isPptx) throw new ImportError('This ZIP file is not a supported Office or OpenDocument file.');
   let actualTotal = 0, failure: Error | null = null, odsMime = '';
   const completed = new Set<string>();
   const unzip = new Unzip(file => {
@@ -80,7 +83,7 @@ function inspectZip(bytes: Buffer): 'xlsx' | 'ods' {
   } catch (error) { if (error instanceof ImportError) throw error; throw invalid(); }
   if (completed.size !== entries.size) throw invalid();
   if (isOds && odsMime !== 'application/vnd.oasis.opendocument.spreadsheet') throw invalid();
-  return isXlsx ? 'xlsx' : 'ods';
+  return isXlsx ? 'xlsx' : isOds ? 'ods' : isDocx ? 'docx' : 'pptx';
 }
 export async function inspectFile(input: File | Buffer | string, options: ParseOptions = {}): Promise<InspectedFile> {
   const isFile = typeof File !== 'undefined' && input instanceof File;
@@ -94,11 +97,15 @@ export async function inspectFile(input: File | Buffer | string, options: ParseO
   const base = { bytes, fileName, mimeType };
   if (bytes.subarray(0, 2).toString() === 'MZ' || bytes.subarray(0, 4).equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46])) || [0xfeedface, 0xfeedfacf, 0xcafebabe, 0x0061736d].includes(bytes.length >= 4 ? bytes.readUInt32BE(0) : 0)) throw new ImportError('Executable files cannot be imported, even if they have been renamed.');
   if (bytes.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 3, 4]))) return { ...base, format: inspectZip(bytes) };
-  if (bytes.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]))) return { ...base, format: 'xls' };
+  if (bytes.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]))) return { ...base, format: bytes.includes(Buffer.from('__properties_version1.0','utf16le')) ? 'msg' : 'xls' };
   if (bytes.subarray(0, 5).toString() === '%PDF-') return { ...base, format: 'pdf' };
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return { ...base, format: 'png' };
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return { ...base, format: 'jpeg' };
-  const text = decodeText(bytes); rejectDTD(text);
+  if(bytes.subarray(0,4).toString()==='RIFF'&&bytes.subarray(8,12).toString()==='WEBP')return {...base,format:'webp'};
+  if(bytes.subarray(4,8).toString()==='ftyp'&&/^(heic|heix|hevc|hevx|mif1|msf1)$/.test(bytes.subarray(8,12).toString()))return {...base,format:'heic'};
+  const text = decodeText(bytes);
+  if(/^(?:[!-9;-~]+:[^\r\n]*\r?\n)+/i.test(text)&&/^(?:from|mime-version|content-type):/im.test(text))return {...base,text,format:'eml'};
+  rejectDTD(text);
   const trimmed = text.trimStart();
   const format: FileFormat = /^[\[{]/.test(trimmed) ? 'json' : trimmed.startsWith('<') ? (/<(?:[\w.-]+:)?Project(?:\s|>)/.test(trimmed) && /<(?:[\w.-]+:)?Tasks(?:\s|>)/.test(trimmed) ? 'msproject' : 'xml') : 'text';
   return { ...base, text, format };
@@ -128,7 +135,7 @@ export function guardedAdapter(adapter: ImportAdapter, allowedFormats?: FileForm
       if (!checked.success) throw new ImportError('No usable table was found, or its columns are invalid. Check the file and try again.');
       return checked.data;
     } catch (error) {
-      if (error instanceof ImportError) throw error;
+      if (error instanceof ImportError || error instanceof Error && ['AiError','RateLimitError','RateLimitUnavailableError'].includes(error.name)) throw error;
       console.error('Import parser failed', { adapter: adapter.id, errorType: error instanceof Error ? error.name : 'unknown' });
       throw new ImportError(`We could not read this ${adapter.label} file. Check its contents and export it again.`);
     }

@@ -13,7 +13,7 @@ describe('trusted client IPs',()=>{
   });
 });
 describe.skipIf(process.env.COSTLENS_LOCAL_REDIS!=='1')('real Redis-backed Upstash limits',()=>{
-  it.each([['ai',20],['import',30],['login',10]]as const)('rejects request above the %s window with HTTP 429 and Retry-After',async(kind,limit)=>{
+  it.each([['ai',20],['import',30],['login',10],['report',10]]as const)('rejects request above the %s window with HTTP 429 and Retry-After',async(kind,limit)=>{
     const id=randomUUID();for(let i=0;i<limit;i++)expect((await enforceRateLimit(kind,id)).remaining).toBe(limit-i-1);
     let error:unknown;try{await enforceRateLimit(kind,id);}catch(cause){error=cause;}
     expect(error).toBeInstanceOf(RateLimitError);const response=rateLimitResponse(error)!;expect(response.status).toBe(429);expect(Number(response.headers.get('retry-after'))).toBeGreaterThan(0);expect((await response.json()).error).toContain('Too many requests');
