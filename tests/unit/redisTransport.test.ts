@@ -13,3 +13,15 @@ it('requires HTTPS for non-loopback backends and does not follow redirects or re
   const fetch=vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response('private-provider-error',{status:403}));
   await expect(createRedisClient('http://127.0.0.1:12345','token').ping()).rejects.toThrow('Redis is temporarily unavailable');expect(fetch.mock.calls[0][1]?.redirect).toBe('error');
 });
+it('loads an uncached script after Upstash returns HTTP 400 NOSCRIPT',async()=>{
+  const fetch=vi.spyOn(globalThis,'fetch')
+    .mockResolvedValueOnce(new Response(JSON.stringify({error:'NOSCRIPT No matching script. Please use EVAL.'}),{status:400}))
+    .mockResolvedValueOnce(new Response(JSON.stringify({result:42})));
+  const redis=createRedisClient('http://127.0.0.1:12345','synthetic-token');
+  expect(await redis.createScript('return 42').exec([],[])).toBe(42);
+  expect(fetch.mock.calls.map(call=>JSON.parse(call[1]?.body as string)[0].toLowerCase())).toEqual(['evalsha','eval']);
+});
+it('keeps other HTTP 400 errors private',async()=>{
+  vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response(JSON.stringify({error:'private-provider-details'}),{status:400}));
+  await expect(createRedisClient('http://127.0.0.1:12345','synthetic-token').ping()).rejects.toThrow('Redis is temporarily unavailable');
+});
