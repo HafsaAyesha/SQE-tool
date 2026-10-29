@@ -2,6 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MAX_DOCUMENT_BYTES } from '@/lib/import/limits';
 const auth = vi.hoisted(() => ({ requireProject: vi.fn() }));
+vi.mock('@/lib/security/rateLimit',()=>({enforceRateLimit:vi.fn(),rateLimitResponse:()=>null,loginIdentifier:()=> 'test-ip',RateLimitError:class extends Error{},RateLimitUnavailableError:class extends Error{}}));
+vi.mock('next/headers',()=>({headers:async()=>new Headers()}));
 vi.mock('@/lib/supabase/requireProject', () => ({ requireProject: auth.requireProject }));
 import { POST } from '@/app/api/projects/[id]/import/parse/route';
 const context = { params: Promise.resolve({ id: '33333333-3333-4333-8333-333333333333' }) };

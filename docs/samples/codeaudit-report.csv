@@ -1,0 +1,4 @@
+﻿Item,Group,Category,Estimated,Actual,Variance,% Variance,Status,Date,Source,Currency,Source reference,Confidence,Notes
+Development,Build,Labour,3000,2800,-200,-6.666666666666667,under,2026-10-01,codeaudit.csv,USD,codeaudit.csv:row 2,,
+Cloud hosting,Build,Cloud,100,80,-20,-20,under,2026-10-02,codeaudit.csv,USD,codeaudit.csv:row 3,,
+AI API,Test,AI API,200,250,50,25,over,2026-10-03,codeaudit.csv,USD,codeaudit.csv:row 4,,

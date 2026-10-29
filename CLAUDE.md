@@ -8,7 +8,7 @@ STACK (do not swap without asking me)
 - Tailwind CSS + shadcn/ui (new-york style), lucide-react icons, Recharts for charts
 - Supabase: Postgres, Auth (email + password), Storage, Row Level Security
 - Zod for every input, API body and AI response
-- Claude API (@anthropic-ai/sdk), called only from server code
+- Gemini API (server-only HTTP gateway), called only from server code
 - Speech-to-text API for audio (OpenAI Whisper by default)
 - Upstash Redis + @upstash/ratelimit for rate limiting
 - Media worker: a separate Node + ffmpeg Docker service in /worker, deployed on Render
@@ -64,6 +64,7 @@ CONVENTIONS
 - Security is built in, not added later: validate on the server with Zod, check project ownership on every query, never expose secrets to the client, never execute or store raw uploaded files longer than needed.
 - Every project-scoped server route must call `requireProject(projectId)` from `/lib/supabase/requireProject.ts` before reading or writing project data; use the user-scoped Supabase server client and retain RLS.
 - Routine validation does not generate screenshots unless I explicitly request them; existing captures are preserved.
+- All AI requests must use server-only `lib/ai/client.ts` → `callAI` (`callClaude` is a compatibility alias); never call Gemini directly elsewhere. Project AI features must pass the authorized projectId. Do not bypass privacy preferences, quotas, schema validation or usage auditing.
 - Pure logic lives in /lib and is unit-tested; components stay thin.
 - Every importer registers itself in /lib/import/registry.ts, so the import wizard picks it up automatically.
 - Errors shown to users are friendly; details are logged on the server only.
@@ -81,3 +82,10 @@ When I ask you to validate a step:
 
 
 reference to this to get the master prompt at the start of every prompt below
+
+FAST TESTING RULES (these override the standard validation format for Phases 3 and 4)
+- After a build prompt: run npm run lint, npm run typecheck, and ONLY the test files you created or changed (npx vitest run <paths>). Do not run Playwright or the full suite unless I ask.
+- Reuse existing fixtures, test users and helpers; do not create new ones if one exists.
+- If a check fails, fix it and re-run only that check.
+- Finish each build prompt with: files changed, tests run (pass/fail), and anything I must configure.
+- The full suite runs only in the phase checks.

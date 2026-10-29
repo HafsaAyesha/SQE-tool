@@ -36,3 +36,11 @@
   body { @apply bg-background text-foreground font-sans antialiased; }
   button, a, input { @apply focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring; }
 }
+
+@media print {
+  body * { visibility: hidden; }
+  #report-preview, #report-preview * { visibility: visible; }
+  #report-preview { position: absolute; inset: 0 auto auto 0; width: 100%; padding: 0; border: 0; box-shadow: none; color: #0f172a; background: #fff; }
+  [data-report-controls] { display: none !important; }
+  #report-preview section { break-inside: avoid-page; }
+}

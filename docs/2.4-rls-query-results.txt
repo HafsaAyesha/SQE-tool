@@ -1,0 +1,24 @@
+ schemaname | tablename | rowsecurity 
+------------+-----------+-------------
+ public     | jobs      | t
+ storage    | objects   | t
+(2 rows)
+
+ schemaname | tablename |     policyname     |  cmd   
+------------+-----------+--------------------+--------
+ public     | jobs      | jobs_read_owner    | SELECT
+ storage    | objects   | media_delete_owner | DELETE
+ storage    | objects   | media_read_owner   | SELECT
+ storage    | objects   | media_upload_owner | INSERT
+(4 rows)
+
+      pubname      | schemaname | tablename 
+-------------------+------------+-----------
+ supabase_realtime | public     | jobs
+(1 row)
+
+      id       | public | file_size_limit 
+---------------+--------+-----------------
+ media-uploads | f      |       524288000
+(1 row)
+

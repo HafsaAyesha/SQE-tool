@@ -1,9 +1,12 @@
+import {assertWritableProject} from '@/lib/demo/access';
 import { NextResponse } from 'next/server';
+import { enforceRateLimit, rateLimitResponse } from '@/lib/security/rateLimit';
 import { revalidatePath } from 'next/cache';
 import { requireProject } from '@/lib/supabase/requireProject';
 import { createClient } from '@/lib/supabase/server';
 import { commitSchema } from '@/lib/import/commitSchema';
 import { importRowSchema } from '@/lib/import/mapping';
+import { deleteMediaUpload,mediaStore } from '@/lib/media/server';
 import { escapeFormula } from '@/lib/security/sanitize';
 export const runtime = 'nodejs';
 const LIMIT = 16 * 1024 * 1024;
@@ -11,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const headers = { 'Cache-Control': 'private, no-store' };
   const fail = (error: string, status = 400) => NextResponse.json({ error }, { status, headers });
   try {
-    const { id } = await params; await requireProject(id);
+    const { id } = await params; const project=await requireProject(id);assertWritableProject(project); await enforceRateLimit('import',project.owner_id);
     if (!request.headers.get('content-type')?.startsWith('application/json')) return fail('Send confirmed rows as JSON.');
     if (Number(request.headers.get('content-length')) > LIMIT) return fail('The confirmed import is too large.', 413);
     if (!request.body) return fail('No confirmed rows were received.');
@@ -24,11 +27,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const rows = data.rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, typeof value === 'string' && ['item','group','category','notes','sourceRef'].includes(key) ? escapeFormula(value) : value])));
     if (rows.some(row => !importRowSchema.safeParse(row).success)) return fail('A formula-like text value is too long after escaping. Shorten it and retry.');
     const supabase = await createClient();
-    const { data: result, error } = await supabase.rpc('commit_cost_import', { p_project: id, p_source: data.source.id ?? null, p_type: data.source.type, p_name: escapeFormula(data.source.name), p_mapping: { columns: data.columns, mapping: data.mapping, currency: data.currency, decimal: data.decimal }, p_mode: data.mode, p_rows: rows, p_template_name: data.templateName ? escapeFormula(data.templateName) : null });
+    const {data:result,error}=data.mediaJobId?await supabase.rpc('commit_media_import',{p_job:data.mediaJobId,p_project:id,p_mapping:{columns:data.columns,mapping:data.mapping,currency:data.currency,decimal:data.decimal},p_rows:rows,p_template_name:data.templateName?escapeFormula(data.templateName):null}):await supabase.rpc('commit_cost_import', { p_project: id, p_source: data.source.id ?? null, p_type: data.source.type, p_name: escapeFormula(data.source.name), p_mapping: { columns: data.columns, mapping: data.mapping, currency: data.currency, decimal: data.decimal, ...(data.fileHash?{fileHash:data.fileHash}:{}) }, p_mode: data.mode, p_rows: rows, p_template_name: data.templateName ? escapeFormula(data.templateName) : null });
     if (error) { console.error('Import transaction failed', { code: error.code }); return fail('The import could not be saved. Check the source selection and database migrations, then retry.', 400); }
+    let cleanupPending=false;
+    if(data.mediaJobId){try{const job=await mediaStore().from('jobs').select('id,project_id,storage_path').eq('id',data.mediaJobId).eq('project_id',id).single();if(job.error)throw new Error();await deleteMediaUpload(job.data);}catch{cleanupPending=true;}}
     revalidatePath('/projects'); revalidatePath(`/projects/${id}`);
-    return NextResponse.json(result, { headers });
+    return NextResponse.json({...result,...(data.mediaJobId?{cleanupPending}:{})}, { headers });
   } catch (error) {
+    const limited=rateLimitResponse(error);if(limited)return limited;
     if (typeof error === 'object' && error && 'digest' in error && error.digest === 'NEXT_HTTP_ERROR_FALLBACK;404') return fail('Project not found.', 404);
     console.error('Import commit failed', { errorType: error instanceof Error ? error.name : 'unknown' });
     return fail('We could not save this import. Please try again.', 500);

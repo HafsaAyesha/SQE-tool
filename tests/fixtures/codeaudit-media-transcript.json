@@ -1,0 +1,143 @@
+{
+  "synthetic": true,
+  "segments": [
+    {
+      "start": 0,
+      "end": 14,
+      "text": "For Code Audit, the cloud hosting budget is one hundred dollars. The actual cost paid is eighty dollars."
+    },
+    {
+      "start": 15,
+      "end": 29,
+      "text": "For developer tools, the planned budget is two hundred dollars. We paid two hundred and twenty dollars."
+    },
+    {
+      "start": 30,
+      "end": 44,
+      "text": "For the A I API, the estimated cost is one hundred and fifty dollars. The actual cost is one hundred and seventy five dollars."
+    },
+    {
+      "start": 45,
+      "end": 59,
+      "text": "For the security audit, the budget is three hundred dollars. The actual amount paid is two hundred and eighty dollars."
+    },
+    {
+      "start": 60,
+      "end": 74,
+      "text": "For domain registration, the estimated cost is forty dollars. We paid thirty five dollars."
+    },
+    {
+      "start": 75,
+      "end": 89,
+      "text": "For database hosting, the budget is one hundred and twenty dollars. The actual cost is one hundred and thirty dollars."
+    },
+    {
+      "start": 90,
+      "end": 104,
+      "text": "For accessibility review, the estimated cost is ninety dollars. We paid eighty five dollars."
+    },
+    {
+      "start": 105,
+      "end": 119,
+      "text": "For report design, the planned budget is sixty dollars. The actual cost paid is fifty dollars."
+    }
+  ],
+  "rows": [
+    {
+      "item": "Cloud hosting",
+      "group": null,
+      "category": null,
+      "estimated": 100,
+      "actual": 80,
+      "currency": "USD",
+      "date": null,
+      "notes": null,
+      "sourceRef": "00:00",
+      "confidence": 0.9
+    },
+    {
+      "item": "Developer tools",
+      "group": null,
+      "category": null,
+      "estimated": 200,
+      "actual": 220,
+      "currency": "USD",
+      "date": null,
+      "notes": null,
+      "sourceRef": "00:15",
+      "confidence": 0.9
+    },
+    {
+      "item": "AI API",
+      "group": null,
+      "category": null,
+      "estimated": 150,
+      "actual": 175,
+      "currency": "USD",
+      "date": null,
+      "notes": null,
+      "sourceRef": "00:30",
+      "confidence": 0.9
+    },
+    {
+      "item": "Security audit",
+      "group": null,
+      "category": null,
+      "estimated": 300,
+      "actual": 280,
+      "currency": "USD",
+      "date": null,
+      "notes": null,
+      "sourceRef": "00:45",
+      "confidence": 0.9
+    },
+    {
+      "item": "Domain registration",
+      "group": null,
+      "category": null,
+      "estimated": 40,
+      "actual": 35,
+      "currency": "USD",
+      "date": null,
+      "notes": null,
+      "sourceRef": "01:00",
+      "confidence": 0.9
+    },
+    {
+      "item": "Database hosting",
+      "group": null,
+      "category": null,
+      "estimated": 120,
+      "actual": 130,
+      "currency": "USD",
+      "date": null,
+      "notes": null,
+      "sourceRef": "01:15",
+      "confidence": 0.9
+    },
+    {
+      "item": "Accessibility review",
+      "group": null,
+      "category": null,
+      "estimated": 90,
+      "actual": 85,
+      "currency": "USD",
+      "date": null,
+      "notes": null,
+      "sourceRef": "01:30",
+      "confidence": 0.9
+    },
+    {
+      "item": "Report design",
+      "group": null,
+      "category": null,
+      "estimated": 60,
+      "actual": 50,
+      "currency": "USD",
+      "date": null,
+      "notes": null,
+      "sourceRef": "01:45",
+      "confidence": 0.9
+    }
+  ]
+}

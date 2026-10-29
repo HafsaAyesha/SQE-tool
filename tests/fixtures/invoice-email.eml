@@ -1,0 +1,35 @@
+From: billing@example.test
+To: costs@example.test
+Subject: CodeAudit invoice
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="codeaudit-boundary"
+
+--codeaudit-boundary
+Content-Type: text/plain; charset=utf-8
+
+The team paid USD 15 for delivery. Invoice attached.
+--codeaudit-boundary
+Content-Type: application/pdf; name="codeaudit-invoice.pdf"
+Content-Disposition: attachment; filename="codeaudit-invoice.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjcKJYGBgYEKCjYgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCAy
+NDAKPj4Kc3RyZWFtCniclZFNSkQxEIT3fYqsBbHTvwmIoOMTF26EXEBkFEUXI+L5regsnMWDkdAJ
+dCqpL5UdXQ3iMsfHM53dbt++tp8vjw+nyb1Z42y91CjjicTKuKP6I63FuCRqvNO5adyEhVtNx9rT
+hKPHkoF+Dw2/KOOVxgktg+5pt+Y4D0YTj7bqyHvHGpoGtxobeME/dbomo9PD9FIYVBv0QQRF+1VM
+qkhhd1dDX6uKsizKyscxCjM39t5ijTHieEZHNlB5ykwtO3YlHLl1zH85Rf1/nD2d8VxcuMope86D
+nwKpRUVSPvlmOqiQayTFmJHYgf83+OZ8CQplbmRzdHJlYW0KZW5kb2JqCgo3IDAgb2JqCjw8Ci9G
+aWx0ZXIgL0ZsYXRlRGVjb2RlCi9UeXBlIC9PYmpTdG0KL04gNQovRmlyc3QgMjYKL0xlbmd0aCAz
+OTQKPj4Kc3RyZWFtCnic1VNRa9wwDH73r9Bj+1CsOI7tlOPgepdsMI4d10HHxh7SxBwpxS6Jb3T/
+flJy7VG2sedihC19n2TJljJAUKA15GAdaChyBQWYTMNiIeSXX08e5K45+FHIT303wndCEfbwQ8h1
+PIYEmVguxZm7blLzGA9idoKMyS+M3RC7Y+sHWNRVXSNaRDSaxCCqDe1rkpJEkU6YcnQmsfokZLM5
+Yr4irJ7F2NmH8YlbnPwr2olrmLOZudrN+uu9fFc1x1D/y6dcCrmN3aZJHi421wqVyTjDAl2O3y7p
+OQbfpPh+i5vy72P4Z4Vv/rmOIQl5e7xPk8rGTMibZvSMgPzoH3/61LeNkFVoY9eHA8i7PqzC2L8Y
+3kbkhuG2GTx31dQ3cu/HeBxaaiTmTZH58Br8ymLpqHLrSurdyeWMlVYr41Rh3J8Y/wBVVjrzN78C
+tSkV2hNGacqvn+8ffDtdz2r1nD7cJn6p2cC2re/65iY+04wgLXpnoD/hSVmFEBPPzjQ1IVGFrJnT
+JJHzb/r/20IKZW5kc3RyZWFtCmVuZG9iagoKOCAwIG9iago8PAovU2l6ZSA5Ci9Sb290IDIgMCBS
+Ci9JbmZvIDMgMCBSCi9GaWx0ZXIgL0ZsYXRlRGVjb2RlCi9UeXBlIC9YUmVmCi9MZW5ndGggNDIK
+L1cgWyAxIDIgMiBdCi9JbmRleCBbIDAgOSBdCj4+CnN0cmVhbQp4nGNgYPj/n4mBnYEBRDCCCCYQ
+wQwiWBgZBBgYGBk9gQSzJQMDAFyiAs8KZW5kc3RyZWFtCmVuZG9iagoKc3RhcnR4cmVmCjgyNQol
+JUVPRg==
+--codeaudit-boundary--

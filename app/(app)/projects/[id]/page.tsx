@@ -8,5 +8,5 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const project = await requireProject(id);
   const rows = await loadCostItems(id);
-  return <><PageHeader title={project.name} description={`${project.currency} · ${rows.length} cost ${rows.length === 1 ? 'item' : 'items'}`} action={<ProjectActions project={project}/>}/><ProjectDashboard key={id} projectId={id} rows={rows} currency={project.currency} saveAction={saveCostItem.bind(null, id)} deleteAction={deleteCostItem.bind(null, id)}/></>;
+  return <><PageHeader title={project.name} description={`${project.currency} · ${rows.length} cost ${rows.length === 1 ? 'item' : 'items'}`} action={<ProjectActions project={project} readOnly={project.readOnly}/>}/><ProjectDashboard key={id} projectId={id} rows={rows} currency={project.currency} saveAction={project.readOnly?undefined:saveCostItem.bind(null, id)} deleteAction={project.readOnly?undefined:deleteCostItem.bind(null, id)}/></>;
 }

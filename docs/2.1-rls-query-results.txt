@@ -1,0 +1,20 @@
+     tablename     | rowsecurity
+-------------------+-------------
+ ai_cache          | t
+ ai_usage          | t
+ cost_items        | t
+ data_sources      | t
+ mapping_templates | t
+ projects          | t
+ user_preferences  | t
+(7 rows)
+
+     tablename     |       policyname        |  cmd   |      roles
+-------------------+-------------------------+--------+-----------------
+ ai_usage          | ai_usage_read_own       | SELECT | {authenticated}
+ cost_items        | cost_items_owner        | ALL    | {authenticated}
+ data_sources      | data_sources_owner      | ALL    | {authenticated}
+ mapping_templates | mapping_templates_owner | ALL    | {authenticated}
+ projects          | projects_owner          | ALL    | {authenticated}
+ user_preferences  | user_preferences_owner  | ALL    | {authenticated}
+(6 rows)

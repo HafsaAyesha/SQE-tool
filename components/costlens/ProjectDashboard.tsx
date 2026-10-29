@@ -2,6 +2,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import {anomalies} from '@/lib/costs/anomalies';
+import type {SummaryFilters} from '@/lib/ai/summarySchema';
+import {InsightsPanel} from './InsightsPanel';
 import { Wallet, Receipt, TrendingUp, TrendingDown, Percent, AlertTriangle, Search, X, Upload, SlidersHorizontal } from 'lucide-react';
 import { burnSeries, dashboardModel, groupings, readDashboardFilters, updateDashboardQuery, type DashboardFilters } from '@/lib/costs/dashboard';
 import type { CostTableRow } from '@/lib/costs/types';
@@ -22,12 +25,16 @@ import { CostShareDonut } from './charts/CostShareDonut';
 const groupLabels = {group:'Group',category:'Category',source:'Source',month:'Month'};
 const signed = (value:number, text:string) => value>0?'+'+text:text;
 const tone = (value:number|null) => value===null||value===0?'neutral':value>0?'over':'under';
-export function ProjectDashboard({ projectId, rows, currency, saveAction, deleteAction, insights }: { insights?:React.ReactNode; projectId:string; rows:CostTableRow[]; currency:string; saveAction:(id:string|null,input:unknown)=>Promise<MutationResult>; deleteAction:(id:string)=>Promise<MutationResult> }) {
+export function ProjectDashboard({ projectId, rows, currency, saveAction, deleteAction, insights }: { insights?:React.ReactNode; projectId:string; rows:CostTableRow[]; currency:string; saveAction?:(id:string|null,input:unknown)=>Promise<MutationResult>; deleteAction?:(id:string)=>Promise<MutationResult> }) {
   const query=useSearchParams();
+  const [view,setView]=useState<'dashboard'|'insights'>('dashboard');
+  const [highlight,setHighlight]=useState<{id:string;version:number}|null>(null);
   const [ready,setReady]=useState(false);
   useEffect(()=>setReady(true),[]);
   const {filters,invalid}=useMemo(()=>readDashboardFilters(new URLSearchParams(query.toString())),[query]);
   const model=useMemo(()=>dashboardModel(rows,currency,filters),[rows,currency,filters]);
+  const flags=useMemo(()=>anomalies(model.monetaryRows),[model.monetaryRows]);
+  const insightFilters:SummaryFilters={...(filters.source?{source:filters.source}:{}),...(filters.category?{category:filters.category}:{}),...(filters.group?{group:filters.group}:{}),...(filters.from?{from:filters.from}:{}),...(filters.to?{to:filters.to}:{}),...(filters.q?{q:filters.q}:{})};
   const sources=useMemo(()=>{
     const values=new Map<string,string>();for(const row of rows)values.set(row.sourceId??'manual',row.sourceName??(row.sourceId===null?'Manual':row.type));return [...values].sort((a,b)=>a[1].localeCompare(b[1],'en'));
   },[rows]);
@@ -72,9 +79,10 @@ export function ProjectDashboard({ projectId, rows, currency, saveAction, delete
       <KpiCard title="Items over budget" value={`${model.totals.overCount} of ${model.totals.itemCount}`} caption="More than 5% above estimate" icon={AlertTriangle} tone={model.totals.overCount?'over':'neutral'}/>
     </div>
     {(model.otherCurrencyCount>0||model.totals.missingCount>0)&&<div role="note" className="space-y-1 rounded-xl border border-warn/30 bg-warn/5 p-4 text-sm text-muted-foreground">{model.otherCurrencyCount>0&&<p>{model.otherCurrencyCount} {model.otherCurrencyCount===1?"item in other currencies stays":"items in other currencies stay"} in the table. Totals and charts use {currency} only.</p>}{model.totals.missingCount>0&&<p>{model.totals.missingCount} {model.totals.missingCount===1?"item has":"items have"} a missing estimate or actual amount. Totals use the known amounts.</p>}</div>}
-    <div className={insights?"grid min-w-0 items-start gap-6 2xl:grid-cols-[minmax(0,1fr)_20rem]":"min-w-0"}><div className="min-w-0 space-y-6">
+    <div role="tablist" aria-label="Dashboard views" className="flex rounded-xl bg-muted p-1 xl:hidden"><button type="button" role="tab" aria-selected={view==='dashboard'} aria-controls="dashboard-view" id="dashboard-tab" className={`flex-1 rounded-lg px-4 py-2 text-sm ${view==='dashboard'?'bg-background shadow-sm':''}`} onClick={()=>setView('dashboard')}>Dashboard</button><button type="button" role="tab" aria-selected={view==='insights'} aria-controls="insights-view" id="insights-tab" className={`flex-1 rounded-lg px-4 py-2 text-sm ${view==='insights'?'bg-background shadow-sm':''}`} onClick={()=>setView('insights')}>AI insights</button></div>
+    <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]"><div id="dashboard-view" className={`min-w-0 space-y-6 ${view==='dashboard'?'':'hidden xl:block'}`}>
     {rows.length===0?<EmptyState title="Your cost story starts here" description="Import your first file or add a cost item below to bring this dashboard to life." action={<Button asChild><Link href={`/projects/${projectId}/import`}><Upload/>Import cost data</Link></Button>}/>:model.rows.length===0?<EmptyState title="No costs match these filters" description="Try a different source, category or date range to see your project again." action={<Button variant="outline" onClick={clear}>Reset dashboard filters</Button>}/>:<div className="grid min-w-0 items-start gap-6 lg:grid-cols-2"><EstimatedVsActualBar data={data} currency={currency} dimension={groupLabels[filters.by].toLowerCase()} onSelect={selectKey}/><VariancePctBar data={data} currency={currency} dimension={groupLabels[filters.by].toLowerCase()} onSelect={selectKey}/><BurnUpLine series={lines} currency={currency} dimension={groupLabels[filters.by].toLowerCase()}/><CostShareDonut data={data} currency={currency} totalActual={model.shareTotal} dimension={groupLabels[filters.by].toLowerCase()} onSelect={selectKey}/></div>}
-    <div id="cost-table" className="min-w-0 scroll-mt-6 space-y-4">{filters.focus&&<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-accent/40 p-4 text-sm"><p>Table focus: <strong>{label(filters.focus)}</strong><span className="ml-2 text-muted-foreground">Charts and KPIs keep the full filtered view.</span></p><Button size="sm" variant="outline" onClick={()=>update({focus:undefined})}>Clear chart focus</Button></div>}<CostTable key={query.toString()} rows={model.tableRows} currency={currency} saveAction={saveAction} deleteAction={deleteAction} hideFilters emptyFiltered={rows.length>0&&model.tableRows.length===0}/></div>
-    </div>{insights&&<aside aria-label="Project insights" className="min-w-0 space-y-6">{insights}</aside>}</div>
+    <div id="cost-table" className="min-w-0 scroll-mt-6 space-y-4">{filters.focus&&<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-accent/40 p-4 text-sm"><p>Table focus: <strong>{label(filters.focus)}</strong><span className="ml-2 text-muted-foreground">Charts and KPIs keep the full filtered view.</span></p><Button size="sm" variant="outline" onClick={()=>update({focus:undefined})}>Clear chart focus</Button></div>}<CostTable anomalies={flags} focusedRowId={highlight?.id} focusToken={highlight?.version} anomaliesOnly={filters.anomalies==='1'} onAnomaliesOnlyChange={value=>update({anomalies:value?'1':undefined})} key={query.toString()} rows={model.tableRows} currency={currency} saveAction={saveAction} deleteAction={deleteAction} hideFilters emptyFiltered={rows.length>0&&model.tableRows.length===0}/></div>
+    </div><aside id="insights-view" aria-label="Project insights" className={`min-w-0 space-y-6 ${view==='insights'?'':'hidden xl:block'}`}>{insights??<InsightsPanel readOnly={!saveAction} key={JSON.stringify(insightFilters)} projectId={projectId} rows={model.monetaryRows} allRows={rows} flags={flags} filters={insightFilters} onSelect={id=>{setHighlight(previous=>({id,version:(previous?.version??0)+1}));setView('dashboard');update({focus:undefined,anomalies:undefined});}}/>}</aside></div>
   </div>;
 }

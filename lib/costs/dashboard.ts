@@ -4,11 +4,11 @@ import type { CostTableRow } from './types';
 export const groupings = ['group', 'category', 'source', 'month'] as const;
 const date = z.string().date();
 const queryFields = {
-  by: z.enum(groupings), source: z.union([z.string().uuid(), z.literal('manual')]),
+  anomalies:z.literal('1'), by: z.enum(groupings), source: z.union([z.string().uuid(), z.literal('manual')]),
   category: z.string().min(1).max(80), group: z.string().min(1).max(120),
   from: date, to: date, q: z.string().min(1).max(200), focus: z.string().min(1).max(256),
 };
-export type DashboardFilters = { by: SummaryBy; source?: string; category?: string; group?: string; from?: string; to?: string; q?: string; focus?: string };
+export type DashboardFilters = { by: SummaryBy; anomalies?:'1'; source?: string; category?: string; group?: string; from?: string; to?: string; q?: string; focus?: string };
 /** Invalid query values are ignored explicitly, never used in a database query. */
 export function readDashboardFilters(query: URLSearchParams) {
   const filters: DashboardFilters = { by: 'category' }; const invalid: string[] = [];
@@ -17,6 +17,7 @@ export function readDashboardFilters(query: URLSearchParams) {
     const parsed = queryFields[key].safeParse(value);
     if (!parsed.success) { invalid.push(key); continue; }
     if (key === 'by') filters.by = parsed.data as SummaryBy;
+    else if(key==='anomalies')filters.anomalies='1';
     else filters[key] = parsed.data;
   }
   if (filters.from && filters.to && filters.from > filters.to) { delete filters.from; delete filters.to; invalid.push('date range'); }

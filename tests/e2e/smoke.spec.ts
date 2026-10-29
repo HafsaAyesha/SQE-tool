@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 test('landing, authentication forms and persistent themes', async ({ page }) => {
   const runtimeErrors: string[] = [];
   const failedBundles: string[] = [];
