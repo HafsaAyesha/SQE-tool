@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({ getUser: vi.fn(), createServerClient: vi.fn(),
 vi.mock('@supabase/ssr', () => ({ createServerClient: mocks.createServerClient }));
 vi.mock('@/lib/supabase/config', () => ({ getSupabaseConfig: mocks.config }));
 import { updateSession } from '@/lib/supabase/middleware';
+import { config as middlewareConfig, middleware } from '../../middleware';
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.config.mockReturnValue({ url: 'https://example.supabase.co', anonKey: 'public-test-key' });
@@ -14,6 +15,12 @@ beforeEach(() => {
   mocks.createServerClient.mockReturnValue({ auth: { getUser: mocks.getUser }, from: mocks.from });
 });
 describe('session middleware', () => {
+  it('runs workspace authentication in Node.js for Vercel services', async () => {
+    expect(middlewareConfig.runtime).toBe('nodejs');
+    expect(middlewareConfig.matcher).toEqual(['/projects/:path*', '/import/:path*', '/reports/:path*', '/settings/:path*', '/login', '/signup']);
+    const response = await middleware(new NextRequest('http://localhost/projects'));
+    expect(response.headers.get('location')).toBe('http://localhost/login');
+  });
   it('fails closed without configuration', async () => {
     mocks.config.mockReturnValue(null);
     const response = await updateSession(new NextRequest('http://localhost/projects'));
