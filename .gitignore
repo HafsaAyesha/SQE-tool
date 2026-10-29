@@ -15,3 +15,6 @@ supabase/.branches/
 # Media worker build/install output
 worker/node_modules/
 worker/dist/
+
+# Vercel project linkage and local service metadata
+.vercel/

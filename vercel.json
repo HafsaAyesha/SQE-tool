@@ -1,0 +1,31 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "costlens": {
+      "root": ".",
+      "framework": "nextjs",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "worker",
+          "format": "url",
+          "env": "WORKER_SERVICE_URL"
+        }
+      ]
+    },
+    "worker": {
+      "root": "worker",
+      "framework": "express",
+      "entrypoint": "src/app.ts",
+      "buildCommand": "npm run build"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "costlens"
+      }
+    }
+  ]
+}

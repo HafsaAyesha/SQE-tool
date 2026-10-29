@@ -2,6 +2,9 @@
 
 ## Current status
 
+The two-service Vercel configuration has been confirmed: `costlens` is public on all paths, `worker` stays internal, and the caller receives `WORKER_SERVICE_URL`. Follow `docs/vercel-services.md` alongside this deployment guide. It adds an internal Express gateway; the Render media processor remains unchanged. `WORKER_SERVICE_URL` is injected by the calling-service binding and must not be entered in dashboard environment settings.
+
+
 Deployment preparation is complete; a live deployment is **not yet verified**. The user selected a new deployment with dashboard instructions. This environment has no Vercel/Render management credentials, Supabase management token or OpenAI speech key. No new Redis database, paid service or provider budget was created here. The existing configured Supabase project already has application tables; none were reset or migrated during this step.
 
 Use the `phase-2-ai-foundation` GitHub branch. It contains the current app, worker and demo. Deploying `main` would deploy older work. The steps below use the providers' normal dashboards; labels may vary slightly by account. Keep keys out of chat and Git.
