@@ -4,8 +4,9 @@ import {writeFileSync,readFileSync} from 'node:fs';
 import {ProxyAgent} from 'undici';
 import {z} from 'zod';
 import {DEMO_PROJECTS} from '../lib/demo/seedPlan';
+import {normalizeSupabaseUrl} from '../lib/supabase/url';
 async function main(){
- const config=z.object({app:z.url(),worker:z.url(),supabase:z.url(),anon:z.string().min(1),service:z.string().min(1)}).safeParse({app:process.env.APP_URL,worker:process.env.WORKER_URL,supabase:process.env.NEXT_PUBLIC_SUPABASE_URL,anon:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,service:process.env.SUPABASE_SERVICE_ROLE_KEY});if(!config.success)throw new Error('Configure APP_URL, WORKER_URL and existing Supabase variables before verification.');
+ const config=z.object({app:z.url(),worker:z.url(),supabase:z.url(),anon:z.string().min(1),service:z.string().min(1)}).safeParse({app:process.env.APP_URL,worker:process.env.WORKER_URL,supabase:normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL)??undefined,anon:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,service:process.env.SUPABASE_SERVICE_ROLE_KEY});if(!config.success)throw new Error('Configure APP_URL, WORKER_URL and existing Supabase variables before verification.');
  const raw=config.data;for(const value of [raw.app,raw.worker,raw.supabase]){const url=new URL(value);if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/')throw new Error('Production URLs must be HTTPS origins.');}
  const {anon,service}=raw,app=new URL(raw.app).origin,worker=new URL(raw.worker).origin,supabase=new URL(raw.supabase).origin;
  const proxyValue=process.env.HTTPS_PROXY||process.env.HTTP_PROXY,proxy=proxyValue?new ProxyAgent(proxyValue):undefined;

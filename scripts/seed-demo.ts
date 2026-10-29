@@ -5,6 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {ProxyAgent} from 'undici';
 import {marketingWord,marketingReceipt} from '../lib/demo/assets';
 import {z} from 'zod';
+import {normalizeSupabaseUrl} from '../lib/supabase/url';
 import {applyMapping,suggestMapping} from '../lib/import/mapping';
 import {parseResponseSchema,costRowSchema,type RawTable} from '../lib/import/schema';
 import {fields} from '../lib/import/mapping';
@@ -15,7 +16,7 @@ async function main(){
 const dry=process.argv.includes('--dry-run');
 for(const name of DEMO_FIXTURES)readFileSync(`tests/fixtures/${name}`);
 if(dry){console.log({projects:DEMO_PROJECTS,codeAuditSources:['CSV','MS Project XML','PDF invoice','actual meeting recording pipeline'],marketingSources:['generated Word table','generated receipt image'],mode:'dry run; no accounts, uploads or external AI calls created'});process.exit(0);}
-const parsed=seedConfigSchema.safeParse({url:process.env.APP_URL,supabaseUrl:process.env.NEXT_PUBLIC_SUPABASE_URL,anon:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,service:process.env.SUPABASE_SERVICE_ROLE_KEY,email:process.env.DEMO_EMAIL??'demo@costlens.example',password:process.env.DEMO_PASSWORD,workerUrl:process.env.WORKER_URL});
+const parsed=seedConfigSchema.safeParse({url:process.env.APP_URL,supabaseUrl:normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL)??undefined,anon:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,service:process.env.SUPABASE_SERVICE_ROLE_KEY,email:process.env.DEMO_EMAIL??'demo@costlens.example',password:process.env.DEMO_PASSWORD,workerUrl:process.env.WORKER_URL});
 if(!parsed.success){console.error('Missing or invalid seed configuration:',parsed.error.issues.map(issue=>issue.path.join('.')).join(', '));process.exit(1);}
 const config={...parsed.data,url:new URL(parsed.data.url).origin,supabaseUrl:new URL(parsed.data.supabaseUrl).origin,workerUrl:new URL(parsed.data.workerUrl).origin},proxyValue=process.env.HTTPS_PROXY||process.env.HTTP_PROXY,proxy=proxyValue?new ProxyAgent(proxyValue):undefined;
 const network:typeof fetch=(input,init={})=>{const hostname=new URL(typeof input==='string'||input instanceof URL?input:input.url).hostname;return fetch(input,{...init,redirect:'error',signal:init.signal??AbortSignal.timeout(90000),...(proxy&&!['localhost','127.0.0.1'].includes(hostname)?{dispatcher:proxy}:{})} as RequestInit);};
