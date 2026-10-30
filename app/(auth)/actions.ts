@@ -34,13 +34,13 @@ export async function authenticate(mode: unknown, input: unknown, redirectOnSucc
   return { message: 'Check your email for a confirmation link, then return here to sign in.' };
 }
 export async function signOut(): Promise<AuthResult> {
-  if (!getSupabaseConfig()) redirect('/login');
+  if (!getSupabaseConfig()) redirect('/');
   try {
     const supabase = await createClient();
-    const {data:{user}}=await supabase.auth.getUser();if(!user)redirect('/login');
+    const {data:{user}}=await supabase.auth.getUser();if(!user)redirect('/');
     await enforceRateLimit('mutation',user.id);
     const { error } = await supabase.auth.signOut();
     if (error) return { error: 'We could not sign you out. Please try again.' };
   } catch(error) {if(typeof error==='object'&&error&&'digest'in error)throw error;if(error instanceof RateLimitError||error instanceof RateLimitUnavailableError)return {error:error.message};console.error('Sign out failed',{type:error instanceof Error?error.name:'unknown'});return { error: 'We could not reach the sign-in service. Please try again.' }; }
-  redirect('/login');
+  redirect('/');
 }

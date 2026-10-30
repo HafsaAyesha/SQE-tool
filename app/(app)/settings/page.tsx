@@ -8,7 +8,7 @@ import { AiSettings } from '@/components/costlens/AiSettings';
 import { KpiCard } from '@/components/costlens/KpiCard';
 import { Sparkles, Gauge, Coins } from 'lucide-react';
 export default async function SettingsPage(){
-  const supabase=await createClient();const {data:{user},error}=await supabase.auth.getUser();if(error||!user)redirect('/login');
+  const supabase=await createClient();const {data:{user},error}=await supabase.auth.getUser();if(error||!user)redirect('/');
   const [usage,preference,quota]=await Promise.allSettled([monthlyAiUsage(user.id),getMaskingPreference(user.id),dailyAiRemaining(user.id)]);
   const available=preference.status==='fulfilled',mask=available?preference.value:true;
   const stats=usage.status==='fulfilled'?usage.value:null,daily=quota.status==='fulfilled'?quota.value:null;

@@ -7,7 +7,7 @@ export async function updateSession(request: NextRequest) {
   const config = getSupabaseConfig();
   // Route groups aren't URL segments: explicitly protect all workspace prefixes.
   const protectedRoute = /^\/(projects|import|reports|settings)(\/|$)/.test(request.nextUrl.pathname);
-  if (!config) return protectedRoute ? NextResponse.redirect(new URL('/login', request.url)) : response;
+  if (!config) return protectedRoute ? new NextResponse('CostLens is not configured yet.', { status: 503 }) : response;
   const supabase = createServerClient(config.url, config.anonKey, { cookies: {
     getAll: () => request.cookies.getAll(),
     setAll(cookiesToSet) {
@@ -16,21 +16,25 @@ export async function updateSession(request: NextRequest) {
       cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
     },
   } });
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (protectedRoute && (error || !user)) {
-    const redirect = NextResponse.redirect(new URL('/login', request.url));
-    response.cookies.getAll().forEach(cookie => redirect.cookies.set(cookie));
-    redirect.headers.set('Cache-Control', 'private, no-store');
-    return redirect;
-  }
-  // An async notFound() inside a loading boundary can otherwise stream HTTP 200.
-  // Check project URLs before rendering, while still retaining requireProject in pages/actions.
-  const projectId = request.nextUrl.pathname.match(/^\/projects\/([^/]+)(?:\/|$)/)?.[1];
   function finish(result: NextResponse) {
     response.cookies.getAll().forEach(cookie => result.cookies.set(cookie));
     result.headers.set('Cache-Control', 'private, no-store');
     return result;
   }
+  // No login screens: every visitor gets a private guest (anonymous) Supabase user, so RLS ownership still applies.
+  if (/^\/(login|signup)\/?$/.test(request.nextUrl.pathname)) return finish(NextResponse.redirect(new URL('/projects', request.url)));
+  let { data: { user } } = await supabase.auth.getUser();
+  if (protectedRoute && !user) {
+    const guest = await supabase.auth.signInAnonymously();
+    if (guest.error || !guest.data.user) {
+      console.error('Guest sign-in failed', { code: guest.error?.code, status: guest.error?.status });
+      return finish(new NextResponse('CostLens could not start a guest session. Please try again shortly.', { status: 503 }));
+    }
+    user = guest.data.user;
+  }
+  // An async notFound() inside a loading boundary can otherwise stream HTTP 200.
+  // Check project URLs before rendering, while still retaining requireProject in pages/actions.
+  const projectId = request.nextUrl.pathname.match(/^\/projects\/([^/]+)(?:\/|$)/)?.[1];
   function missingProject() {
     return finish(NextResponse.rewrite(new URL('/not-found', request.url), { status: 404 }));
   }
