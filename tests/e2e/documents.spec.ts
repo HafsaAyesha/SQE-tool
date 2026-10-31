@@ -1,4 +1,4 @@
-import {test,expect} from './fixtures';
+import { test, expect, signIn } from './fixtures';
 import {createClient} from '@supabase/supabase-js';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
@@ -34,7 +34,7 @@ test('document fixtures: estimates, extraction, auto mapping, confidence/source 
   const image=await prepareImage(readFileSync('tests/fixtures/receipt.jpg'));await seed([],[{mimeType:'image/jpeg',sourceRef:'image 1',data:image.bytes}],[cost('Domain registration','image 1',null,25),cost('Test cloud credits','image 1',null,22.5)]);
   const slides=readSlides(readFileSync('tests/fixtures/budget-slide.pptx'));await seed(slides.map(slide=>({sourceRef:slide.sourceRef,text:[slide.text,...slide.tables.filter((matrix,index)=>!structuredRows(matrix,`${slide.sourceRef}: table ${index+1}`,'USD').length).map(matrix=>matrix.map(row=>row.join('\t')).join('\n'))].join('\n')})),[],[cost('Presentation design','slide 1',90,null)]);
   const mail=await readEmail(readFileSync('tests/fixtures/invoice-email.eml'),'eml');await seed([{sourceRef:'email body',text:mail.text}],[],[cost('Delivery','email body',null,15)]);
-  await page.goto('/login');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Log in',exact:true}).click();await expect(page).toHaveURL(/\/projects$/);
+  await signIn(page,email,password);
   let savedCount=0;
   for(const [name,count] of [['codeaudit-budget.docx',4],['codeaudit-invoice.pdf',2],['codeaudit-scan.pdf',2],['receipt.jpg',2],['budget-slide.pptx',2],['invoice-email.eml',3]] as const){
    await page.goto(`/projects/${id}/import`);await page.getByLabel('Choose cost data file',{exact:true}).setInputFiles(`tests/fixtures/${name}`);await expect(page.getByRole('region',{name:'AI extraction estimate'})).toBeVisible();

@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, signIn } from './fixtures';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes, randomUUID } from 'node:crypto';
 
@@ -20,11 +20,7 @@ test('project and cost item CRUD, reload persistence, summaries, filters and pag
   try {
     const { error: loginError } = await client.auth.signInWithPassword({ email, password });
     expect(loginError).toBeNull();
-    await page.goto('/login');
-    await page.getByLabel('Email', { exact: true }).fill(email);
-    await page.getByLabel('Password', { exact: true }).fill(password);
-    await page.getByRole('button', { name: 'Log in', exact: true }).click();
-    await expect(page).toHaveURL(/\/projects$/);
+    await signIn(page,email,password);
     await expect(page.getByRole('heading', { name: 'Create your first project' })).toBeVisible();
     for (const theme of ['Light', 'Dark']) {
       await page.getByRole('button', { name: 'Choose theme', exact: true }).click();
@@ -187,11 +183,7 @@ test('signed-in user B gets HTTP 404 for user A’s project', async ({ page }) =
     expect((await clientA.auth.signInWithPassword({ email: `costlens-access-${run}-a@example.com`, password })).error).toBeNull();
     const project = await clientA.from('projects').insert({ owner_id: userIds[0], name: `Private A project ${run}`, currency: 'USD' }).select('id').single();
     expect(project.error).toBeNull();
-    await page.goto('/login');
-    await page.getByLabel('Email', { exact: true }).fill(`costlens-access-${run}-b@example.com`);
-    await page.getByLabel('Password', { exact: true }).fill(password);
-    await page.getByRole('button', { name: 'Log in', exact: true }).click();
-    await expect(page).toHaveURL(/\/projects$/);
+    await signIn(page,`costlens-access-${run}-b@example.com`,password);
     const response = await page.goto(`/projects/${project.data!.id}`);
     expect(response?.status()).toBe(404);
     await expect(page).toHaveURL(new RegExp(`/projects/${project.data!.id}$`));

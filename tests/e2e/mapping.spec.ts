@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, signIn } from './fixtures';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -19,7 +19,7 @@ test('full import: fixtures, unusual mapping, inline fixes, templates, source re
     const b=await admin.auth.admin.createUser({email:`costlens-mapping-b-${run}@example.com`,password,email_confirm:true});expect(b.error).toBeNull();ids.push(b.data.user!.id);
     expect((await client.auth.signInWithPassword({email,password})).error).toBeNull();
     const project=await client.from('projects').insert({owner_id:ids[0],name:'Mapping tests',currency:'USD'}).select('id').single();expect(project.error).toBeNull(); const id=project.data!.id;
-    await page.goto('/login');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Log in',exact:true}).click();await expect(page).toHaveURL(/\/projects$/);
+    await signIn(page,email,password);
     // Every structured fixture goes through the real parser, mapper, commit route and database.
     for(const name of ['codeaudit.csv','codeaudit.tsv','codeaudit.xlsx','codeaudit.xls','codeaudit.ods','codeaudit.json','codeaudit.xml','codeaudit-msproject.xml','codeaudit-paste.txt']) {
       const response=await page.request.post(`/api/projects/${id}/import/parse`,{multipart:{file:{name,mimeType:'application/octet-stream',buffer:readFileSync(`tests/fixtures/${name}`)},full:'true',...(name.endsWith('paste.txt')?{adapterId:'paste'}:{})}});
@@ -72,7 +72,7 @@ test('full import: fixtures, unusual mapping, inline fixes, templates, source re
     // Direct route invalid rows and cross-user requests must fail without modifying data.
     const invalidBody={source:{type:'csv',name:'bad'},mapping:{item:'Item'},columns:['Item'],currency:'USD',mode:'append',rows:[{item:'',group:null,category:null,estimated:0,actual:1,currency:'USD',date:null,notes:null,sourceRef:null,confidence:null}]};
     expect((await page.request.post(`/api/projects/${id}/import/commit`,{data:invalidBody})).status()).toBe(400);
-    const other=await browser.newContext();try{const p=await other.newPage();await p.goto('/login');await p.getByLabel('Email',{exact:true}).fill(`costlens-mapping-b-${run}@example.com`);await p.getByLabel('Password',{exact:true}).fill(password);await p.getByRole('button',{name:'Log in',exact:true}).click();await expect(p).toHaveURL(/\/projects$/);expect((await other.request.post(`/api/projects/${id}/import/commit`,{data:invalidBody})).status()).toBe(404);expect((await other.request.get(`/api/projects/${id}/import/templates`)).status()).toBe(404);}finally{await other.close();}
+    const other=await browser.newContext();try{const p=await other.newPage();await signIn(p,`costlens-mapping-b-${run}@example.com`,password);expect((await other.request.post(`/api/projects/${id}/import/commit`,{data:invalidBody})).status()).toBe(404);expect((await other.request.get(`/api/projects/${id}/import/templates`)).status()).toBe(404);}finally{await other.close();}
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   } finally {for(const id of ids)expect((await admin.auth.admin.deleteUser(id)).error).toBeNull();}
 });
@@ -88,7 +88,7 @@ test('live JSON API and HTML table import through fetch, mapping and transaction
   try {
     expect((await client.auth.signInWithPassword({email,password})).error).toBeNull();
     const project=await client.from('projects').insert({owner_id:uid,name:'Live online mapping',currency:'USD'}).select('id').single();expect(project.error).toBeNull();const id=project.data!.id;
-    await page.goto('/login');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Log in',exact:true}).click();await expect(page).toHaveURL(/\/projects$/);
+    await signIn(page,email,password);
     for(const [source,kind,itemColumn,count] of [['https://jsonplaceholder.typicode.com/todos','JSON / CSV / REST API','title',200],['https://www.w3.org/WAI/tutorials/tables/one-header/','Web page table','Date',3]] as const) {
       await page.goto(`/projects/${id}/import`);await page.getByRole('tab',{name:'From a link'}).click();await page.getByLabel('Source URL',{exact:true}).fill(source);
       await page.getByRole('combobox',{name:'Source type',exact:true}).click();await page.getByRole('option',{name:kind,exact:true}).click();await page.getByRole('button',{name:'Fetch source',exact:true}).click();

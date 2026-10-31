@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, signIn } from './fixtures';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -15,7 +15,7 @@ test('CodeAudit variance, percentages, status bands, zero/missing values and com
   try {
     expect((await client.auth.signInWithPassword({email,password})).error).toBeNull();
     const project=await client.from('projects').insert({owner_id:uid,name:'CodeAudit calculations',currency:'USD'}).select('id').single();expect(project.error).toBeNull();const id=project.data!.id;
-    await page.goto('/login');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Log in',exact:true}).click();await expect(page).toHaveURL(/\/projects$/);
+    await signIn(page,email,password);
     const parsed=await page.request.post(`/api/projects/${id}/import/parse`,{multipart:{file:{name:'codeaudit.csv',mimeType:'text/csv',buffer:readFileSync('tests/fixtures/codeaudit.csv')},full:'true'}});expect(parsed.status()).toBe(200);
     const raw=await parsed.json(),mapping=suggestMapping(raw.columns).mapping,result=applyMapping(raw,mapping,{currency:'USD'});expect(result.errors).toEqual([]);
     expect((await page.request.post(`/api/projects/${id}/import/commit`,{data:{source:{type:raw.meta.sourceType,name:'codeaudit.csv'},mapping,columns:raw.columns,currency:'USD',mode:'append',rows:result.rows}})).status()).toBe(200);

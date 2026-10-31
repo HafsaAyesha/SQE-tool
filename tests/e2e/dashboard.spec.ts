@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, signIn } from './fixtures';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes, randomUUID } from 'node:crypto';
 
@@ -21,7 +21,7 @@ test('CodeAudit dashboard shares URL filters across KPIs/charts/table, supports 
       {project_id:id,source_id:a,item:'Cloud hosting',grp:'Build',category:'Cloud',estimated:100,actual:80,date:'2026-10-02'},
       {project_id:id,source_id:b,item:'AI API',grp:'Test',category:'AI API',estimated:200,actual:250,date:'2026-10-03'},
     ])).error).toBeNull();
-    await page.goto('/login');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Log in',exact:true}).click();await expect(page).toHaveURL(/\/projects$/);
+    await signIn(page,email,password);
     await page.goto(`/projects/${id}`);
     const kpi=(name:string)=>page.getByRole('region',{name,exact:true});
     const table=page.getByRole('region',{name:'Cost items',exact:true});

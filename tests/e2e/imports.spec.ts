@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, signIn } from './fixtures';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -23,11 +23,7 @@ test('structured import wizard options, paste, previews, rejection and project o
     const project = await client.from('projects').insert({ owner_id: userIds[0], name: 'CodeAudit import', currency: 'USD' }).select('id').single();
     expect(project.error).toBeNull();
     const id = project.data!.id;
-    await page.goto('/login');
-    await page.getByLabel('Email', { exact: true }).fill(`costlens-imports-${run}-a@example.com`);
-    await page.getByLabel('Password', { exact: true }).fill(password);
-    await page.getByRole('button', { name: 'Log in', exact: true }).click();
-    await expect(page).toHaveURL(/\/projects$/);
+    await signIn(page,`costlens-imports-${run}-a@example.com`,password);
     await page.goto(`/projects/${id}`);
     await page.getByRole('main').getByRole('link', { name: 'Import', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/projects/${id}/import$`), { timeout: 15000 });
@@ -72,11 +68,7 @@ test('structured import wizard options, paste, previews, rejection and project o
     const other = await browser.newContext();
     try {
       const otherPage = await other.newPage();
-      await otherPage.goto('/login');
-      await otherPage.getByLabel('Email', { exact: true }).fill(`costlens-imports-${run}-b@example.com`);
-      await otherPage.getByLabel('Password', { exact: true }).fill(password);
-      await otherPage.getByRole('button', { name: 'Log in', exact: true }).click();
-      await expect(otherPage).toHaveURL(/\/projects$/);
+      await signIn(otherPage,`costlens-imports-${run}-b@example.com`,password);
       const forbidden = await other.request.post(`/api/projects/${id}/import/parse`, { multipart: { file: { name: 'fake.csv', mimeType: 'text/csv', buffer: readFileSync('tests/fixtures/fake.csv') } } });
       expect(forbidden.status()).toBe(404);
       expect(await forbidden.json()).toEqual({ error: 'Project not found.' });

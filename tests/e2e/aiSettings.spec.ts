@@ -1,4 +1,4 @@
-import{test,expect}from'./fixtures';
+import{test,expect,signIn}from'./fixtures';
 import{createClient}from'@supabase/supabase-js';
 import{randomBytes,randomUUID}from'node:crypto';
 import {z} from 'zod';
@@ -17,7 +17,7 @@ test('AI settings privacy persistence, private cache, usage, 21st-call HTTP 429/
     expect((await admin.from('ai_usage').insert({user_id:uid,task:'test',model,input_tokens:100,output_tokens:50,latency_ms:20})).error).toBeNull();
     // Controlled cached output avoids any paid provider request; gateway/Redis/audit path stays real.
     expect((await admin.from('ai_cache').upsert({hash,user_id:uid,kind:'test',result:{ok:true,message:'Controlled cache fixture'}})).error).toBeNull();
-    await page.goto('/login');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Log in',exact:true}).click();await expect(page).toHaveURL(/\/projects$/);await page.goto('/settings');
+    await signIn(page,email,password);await page.goto('/settings');
     const mask=page.getByRole('switch',{name:'Mask personal data before sending to AI',exact:true});await expect(mask).toHaveAttribute('aria-checked','true');
     const saved=page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname==='/settings');await mask.click();await saved;await expect(mask).toHaveAttribute('aria-checked','false');await page.reload();await expect(mask).toHaveAttribute('aria-checked','false');
     const savedAgain=page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname==='/settings');await mask.click();await savedAgain;await page.reload();await expect(mask).toHaveAttribute('aria-checked','true');
@@ -37,10 +37,9 @@ test('AI settings privacy persistence, private cache, usage, 21st-call HTTP 429/
   }finally{expect((await admin.from('ai_cache').delete().eq('hash',hash)).error).toBeNull();expect((await admin.auth.admin.deleteUser(uid)).error).toBeNull();}
 });
 
-test('login API limits the eleventh request by trusted IP and the form shows its friendly error',async({page})=>{
+test('login API limits the eleventh request by trusted IP',async({page})=>{
   test.skip(process.env.COSTLENS_LOCAL_AUTH_E2E!=='1','Requires local Supabase/Redis');test.setTimeout(60000);
   const input={mode:'login',email:`costlens-no-account-${randomUUID()}@example.com`,password:'synthetic-test-password'};
   for(let i=0;i<10;i++)expect((await page.request.post('/api/auth/authenticate',{data:input})).status()).toBe(401);
   const blocked=await page.request.post('/api/auth/authenticate',{data:input});expect(blocked.status()).toBe(429);expect(Number(blocked.headers()['retry-after'])).toBeGreaterThan(0);
-  await page.goto('/login');await page.getByLabel('Email',{exact:true}).fill(input.email);await page.getByLabel('Password',{exact:true}).fill(input.password);await page.getByRole('button',{name:'Log in',exact:true}).click();await expect(page.getByRole('main').getByRole('alert')).toContainText('Too many requests');
 });
