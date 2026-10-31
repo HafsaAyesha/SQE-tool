@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-const mocks = vi.hoisted(() => ({ getUser: vi.fn(), createServerClient: vi.fn(), config: vi.fn(), from: vi.fn(), select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getUser: vi.fn(), signInAnonymously: vi.fn(), createServerClient: vi.fn(), config: vi.fn(), from: vi.fn(), select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn() }));
 vi.mock('@supabase/ssr', () => ({ createServerClient: mocks.createServerClient }));
 vi.mock('@/lib/supabase/config', () => ({ getSupabaseConfig: mocks.config }));
 import { updateSession } from '@/lib/supabase/middleware';
@@ -12,24 +12,41 @@ beforeEach(() => {
   const query = { select: mocks.select, eq: mocks.eq, maybeSingle: mocks.maybeSingle };
   for (const mock of [mocks.from, mocks.select, mocks.eq]) mock.mockReturnValue(query);
   mocks.maybeSingle.mockResolvedValue({ data: { id: 'project' }, error: null });
-  mocks.createServerClient.mockReturnValue({ auth: { getUser: mocks.getUser }, from: mocks.from });
+  mocks.signInAnonymously.mockResolvedValue({ data: { user: { id: 'guest', is_anonymous: true } }, error: null });
+  mocks.createServerClient.mockReturnValue({ auth: { getUser: mocks.getUser, signInAnonymously: mocks.signInAnonymously }, from: mocks.from });
 });
 describe('session middleware', () => {
   it('runs workspace authentication in Node.js for Vercel services', async () => {
     expect(middlewareConfig.runtime).toBe('nodejs');
     expect(middlewareConfig.matcher).toEqual(['/projects/:path*', '/import/:path*', '/reports/:path*', '/settings/:path*', '/login', '/signup']);
     const response = await middleware(new NextRequest('http://localhost/projects'));
-    expect(response.headers.get('location')).toBe('http://localhost/login');
+    expect(response.headers.get('location')).toBeNull();
+    expect(mocks.signInAnonymously).toHaveBeenCalledOnce();
+  });
+  it('sends the removed login and signup pages straight into the workspace', async () => {
+    for (const path of ['/login', '/signup']) {
+      const response = await updateSession(new NextRequest(`http://localhost${path}`));
+      expect(response.headers.get('location')).toBe('http://localhost/projects');
+    }
+    expect(mocks.signInAnonymously).not.toHaveBeenCalled();
   });
   it('fails closed without configuration', async () => {
     mocks.config.mockReturnValue(null);
     const response = await updateSession(new NextRequest('http://localhost/projects'));
-    expect(response.headers.get('location')).toBe('http://localhost/login');
+    expect(response.status).toBe(503);
     expect(mocks.createServerClient).not.toHaveBeenCalled();
   });
-  it('redirects unauthenticated nested workspace routes', async () => {
+  it('gives new visitors a guest session, then still checks project ownership', async () => {
+    const response = await updateSession(new NextRequest('http://localhost/projects/33333333-3333-4333-8333-333333333333'));
+    expect(mocks.signInAnonymously).toHaveBeenCalledOnce();
+    expect(mocks.eq).toHaveBeenCalledWith('owner_id', 'guest');
+    expect(response.status).toBe(200);
+  });
+  it('fails closed with 503 when guest sign-in is unavailable', async () => {
+    mocks.signInAnonymously.mockResolvedValue({ data: { user: null }, error: { code: 'anonymous_provider_disabled', status: 422 } });
     const response = await updateSession(new NextRequest('http://localhost/projects/id/import'));
-    expect(response.headers.get('location')).toBe('http://localhost/login');
+    expect(response.status).toBe(503);
+    expect(mocks.from).not.toHaveBeenCalled();
   });
   it('lets verified users through and refreshes response and request cookies', async () => {
     const request = new NextRequest('http://localhost/projects');
@@ -43,13 +60,13 @@ describe('session middleware', () => {
     expect(response.cookies.get('refreshed-session')?.value).toBe('test-session');
     expect(response.headers.get('cache-control')).toContain('no-store');
   });
-  it('keeps cleared or refreshed cookies when redirecting a signed-out user', async () => {
+  it('keeps cleared or refreshed cookies when starting a guest session', async () => {
     mocks.getUser.mockImplementation(async () => {
       mocks.createServerClient.mock.calls[0][2].cookies.setAll([{ name: 'expired-session', value: '', options: { maxAge: 0, path: '/' } }]);
       return { data: { user: null }, error: null };
     });
     const response = await updateSession(new NextRequest('http://localhost/reports'));
-    expect(response.headers.get('location')).toBe('http://localhost/login');
+    expect(response.headers.get('location')).toBeNull();
     expect(response.cookies.get('expired-session')?.value).toBe('');
   });
   it('checks project and owner IDs before rendering an authorized project URL', async () => {

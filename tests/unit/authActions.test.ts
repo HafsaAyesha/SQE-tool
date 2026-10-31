@@ -40,9 +40,9 @@ describe('server authentication actions', () => {
     expect(result.error).not.toContain('internal provider detail');
     logger.mockRestore();
   });
-  it('signs out and redirects to login', async () => {
+  it('signs out and returns to the home page', async () => {
     mocks.signout.mockResolvedValue({ error: null });
-    await expect(signOut()).rejects.toThrow('REDIRECT:/login');
+    await expect(signOut()).rejects.toThrow('REDIRECT:/');
     expect(mocks.signout).toHaveBeenCalled();
   });
   it('does not claim sign-out succeeded when the provider fails', async () => {

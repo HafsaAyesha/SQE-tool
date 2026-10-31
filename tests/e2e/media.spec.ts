@@ -1,4 +1,4 @@
-import {test,expect} from './fixtures';
+import { test, expect, signIn } from './fixtures';
 import {createClient} from '@supabase/supabase-js';
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
@@ -19,7 +19,7 @@ test('direct recording uploads, live job progress, timestamp playback, confirmed
   const model=process.env.GEMINI_MODEL_SMART||'gemini-flash-lite-latest',content=JSON.stringify({defaultCurrency:'USD',transcript:fixture.segments.map((part:{start:number;text:string})=>({sourceRef:timestampRef(part.start),text:part.text})),frames:[]});
   const hash=aiCacheKey('extraction',model,{userId:uid,projectId:id,system:MEDIA_EXTRACTION_SYSTEM,content,schema:JSON.stringify(z.toJSONSchema(extractedCostsSchema)),maxTokens:8192,mask:true});expect((await admin.from('ai_cache').upsert({hash,user_id:uid,project_id:id,kind:'extraction',result:fixture.rows})).error).toBeNull();
   async function callback(jobId:string,action:string,payload:Record<string,unknown>={}){const timestamp=Math.floor(Date.now()/1000),body=JSON.stringify({jobId,timestamp,action,...payload});const response=await page.request.post('/api/media/worker',{headers:{'Content-Type':'application/json','x-costlens-signature':signMedia(jobId,timestamp,process.env.WORKER_SECRET!,action,body)},data:body});expect(response.status(),await response.text()).toBe(200);return response;}
-  await page.goto('/login');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Log in',exact:true}).click();await expect(page).toHaveURL(/\/projects$/);
+  await signIn(page,email,password);
   let saved=0;
   for(const name of ['codeaudit-meeting.mp3','codeaudit-screen.mp4']){
    await page.goto(`/projects/${id}/import`);await page.getByLabel('Choose cost data file',{exact:true}).setInputFiles('tests/fixtures/'+name);await expect(page.getByRole('button',{name:'Upload and process recording',exact:true})).toBeDisabled();await page.getByLabel('I agree to send this recording to the speech-to-text provider and review the extracted costs.').check();

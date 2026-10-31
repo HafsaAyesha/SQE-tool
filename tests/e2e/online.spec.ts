@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, signIn } from './fixtures';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes, randomUUID } from 'node:crypto';
 
@@ -17,8 +17,7 @@ test('online wizard rejects internal URLs through the real API and hands control
     expect((await client.auth.signInWithPassword({ email, password })).error).toBeNull();
     const project = await client.from('projects').insert({ owner_id: userId, name: 'Online import tests', currency: 'USD' }).select('id').single();
     expect(project.error).toBeNull();
-    await page.goto('/login'); await page.getByLabel('Email', { exact: true }).fill(email); await page.getByLabel('Password', { exact: true }).fill(password); await page.getByRole('button', { name: 'Log in', exact: true }).click();
-    await expect(page).toHaveURL(/\/projects$/);
+    await signIn(page,email,password);
     await page.goto(`/projects/${project.data!.id}/import`);
     await page.getByRole('tab', { name: 'From a link' }).click();
     await page.getByLabel('Source URL', { exact: true }).fill('http://127.0.0.1/latest/meta-data');

@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-test('landing, authentication forms and persistent themes', async ({ page }) => {
+test('landing links straight into the app and themes persist', async ({ page }) => {
   const runtimeErrors: string[] = [];
   const failedBundles: string[] = [];
   page.on('pageerror', error => runtimeErrors.push(error.message));
@@ -8,34 +8,23 @@ test('landing, authentication forms and persistent themes', async ({ page }) => 
   await page.goto('/');
   await expect(page.locator('html')).toHaveClass(/dark/);
   await expect(page.getByText('Analyse costs from any file, tool or recording', { exact: true })).toBeVisible();
-  await page.getByRole('link', { name: 'Login', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Login' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Get started' })).toHaveAttribute('href', '/projects');
   for (const theme of ['Light', 'Dark']) {
     await page.getByRole('button', { name: 'Choose theme' }).click();
     await page.getByRole('menuitem', { name: theme, exact: true }).click();
     await page.reload();
     await expect(page.locator('html')).toHaveClass(new RegExp(theme.toLowerCase()));
   }
-  await page.getByRole('button', { name: 'Log in', exact: true }).click();
-  await expect(page.getByText('Enter a valid email address.')).toBeVisible();
-  await expect(page.getByText('Use at least 10 characters.')).toBeVisible();
-  await page.getByRole('link', { name: 'Create an account' }).click();
-  await expect(page.getByRole('heading', { name: 'A little clarity goes a long way' })).toBeVisible();
-  await page.getByLabel('Email', { exact: true }).fill('invalid');
-  await page.getByLabel('Password', { exact: true }).fill('short');
-  await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByText('Enter a valid email address.')).toBeVisible();
-  await expect(page.getByText('Use at least 10 characters.')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  if (process.env.COSTLENS_CAPTURE_SCREENSHOTS === '1') await page.screenshot({ path: `docs/screenshots/1.2-signup-${page.viewportSize()!.width}-dark.png`, fullPage: true });
   expect(runtimeErrors).toEqual([]);
   expect(failedBundles).toEqual([]);
 });
-test('signed-out visitors cannot access any workspace route', async ({ page }) => {
-  for (const path of ['/projects', '/projects/11111111-1111-4111-8111-111111111111', '/import', '/reports', '/settings']) {
+test('the removed login and sign-up pages send visitors into the workspace', async ({ page }) => {
+  test.skip(process.env.COSTLENS_LOCAL_AUTH_E2E !== '1', 'Guest sessions need the local Supabase runner');
+  for (const path of ['/login', '/signup', '/import', '/reports', '/settings']) {
     await page.goto(path);
-    await expect(page).toHaveURL(/\/login$/);
-    await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'User menu' })).not.toBeVisible();
+    await expect(page).not.toHaveURL(/\/(login|signup)$/);
+    await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
   }
 });

@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 // Different tests model different client IPs; production trust is never bypassed.
 export const test=base.extend({context:async({context},provide,info)=>{
@@ -9,3 +9,11 @@ export const test=base.extend({context:async({context},provide,info)=>{
   await provide(context);
 }});
 export { expect };
+// The login screens were removed (visitors get guest workspaces), so tests sign a known test user in through the auth API.
+// page.request shares the browser context's cookies, so the page is signed in afterwards.
+export async function signIn(page:Page,email:string,password:string){
+  const response=await page.request.post('/api/auth/authenticate',{data:{mode:'login',email,password}});
+  expect(response.status(),'test user sign-in').toBe(200);
+  await page.goto('/projects');
+  await expect(page).toHaveURL(/\/projects$/);
+}

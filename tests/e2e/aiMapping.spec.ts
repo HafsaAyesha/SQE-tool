@@ -1,4 +1,4 @@
-import {test,expect} from './fixtures';
+import { test, expect, signIn } from './fixtures';
 import {createClient} from '@supabase/supabase-js';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {z} from 'zod';
@@ -20,7 +20,7 @@ test('one-click AI mapping of odd headers, reasons, confirmation, import and sav
     const result={item:{column:'Deliverable',confidence:.98,reason:'Describes the work delivered.'},estimated:{column:'Quoted',confidence:.96,reason:'Quoted prices represent planned costs.'},actual:{column:'Invoiced',confidence:.97,reason:'Invoiced amounts represent incurred costs.'}};
     // Private seeded cache exercises the actual route/gateway/quota/audit path without paid calls.
     expect((await admin.from('ai_cache').upsert({hash,user_id:uid,project_id:id,kind:'mapping',result})).error).toBeNull();
-    await page.goto('/login');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Log in',exact:true}).click();await expect(page).toHaveURL(/\/projects$/);
+    await signIn(page,email,password);
     async function upload(){await page.goto(`/projects/${id}/import`);await page.getByLabel('Choose cost data file',{exact:true}).setInputFiles('tests/fixtures/codeaudit-ai.csv');await page.getByRole('button',{name:'Continue to mapping',exact:true}).click();await expect(page.getByText('Loading saved mappings…')).not.toBeVisible();}
     await upload();await expect(page.getByRole('button',{name:'Ask AI to map columns',exact:true})).toBeEnabled();const response=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/suggest-mapping'));await page.getByRole('button',{name:'Ask AI to map columns',exact:true}).click();const received=await response;expect(received.status(),await received.text()).toBe(200);expect((await received.json()).cached).toBe(true);
     for(const [column,field] of [['Deliverable','Item'],['Quoted','Estimated'],['Invoiced','Actual']])await expect(page.getByRole('combobox',{name:`Map ${column}`,exact:true})).toHaveText(field);
